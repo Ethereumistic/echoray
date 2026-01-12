@@ -10,6 +10,16 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "echoray",
 	"main": ".open-next/worker.js",
+	"routes": [
+		{
+			"pattern": "echoray.io",
+			"custom_domain": true
+		},
+		{
+			"pattern": "www.echoray.io",
+			"custom_domain": true
+		}
+	],
 	"compatibility_date": "2025-12-01",
 	"compatibility_flags": [
 		"nodejs_compat",
