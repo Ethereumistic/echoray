@@ -8,7 +8,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "echoray",
+	"name": "echoray-web",
 	"main": ".open-next/worker.js",
 	"routes": [
 		{
@@ -39,7 +39,7 @@
 			// Self-reference service binding, the service name must match the worker name
 			// see https://opennext.js.org/cloudflare/caching
 			"binding": "WORKER_SELF_REFERENCE",
-			"service": "echoray"
+			"service": "echoray-web"
 		}
 	],
 	"observability": {
