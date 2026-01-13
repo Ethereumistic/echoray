@@ -186,8 +186,8 @@ const TechBubble = ({ Icon, x, y, duration, delay, totalCycle, reverse = false }
             />
 
             {/* --- BUBBLE CONTAINER --- */}
-            <div className="relative flex items-center justify-center w-[3rem] h-[3rem] rounded-full border border-primary/20 bg-background/60 backdrop-blur-[2rem] shadow-[0_0_1.5rem_rgba(var(--primary),0.1)]">
-                <Icon className="w-[1.25rem] h-[1.25rem] text-primary brightness-110" />
+            <div className="relative flex items-center justify-center w-12 h-12 rounded-full border border-primary/20 bg-background/60 backdrop-blur-[2rem] shadow-[0_0_1.5rem_rgba(var(--primary),0.1)]">
+                <Icon className="w-5 h-5 text-primary brightness-110" />
             </div>
         </div>
     )
