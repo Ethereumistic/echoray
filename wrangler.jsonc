@@ -2,9 +2,10 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "echoray",
 	"main": ".open-next/worker.js",
-	"compatibility_date": "2024-12-30",
+	"compatibility_date": "2025-05-05",
 	"compatibility_flags": [
-		"nodejs_compat"
+		"nodejs_compat",
+		"global_fetch_strictly_public"
 	],
 	"assets": {
 		"directory": ".open-next/assets",
@@ -29,6 +30,7 @@
 	"vars": {
 		"NEXT_PUBLIC_SUPABASE_URL": "https://xwzhwrxsrbtoqvehmmjm.supabase.co",
 		"NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_N-oys_Lw0io9YA-9UofmJA_lNubn-_0",
+		"NEXT_PUBLIC_SUPABASE_KEY": "sb_publishable_N-oys_Lw0io9YA-9UofmJA_lNubn-_0",
 		"NEXT_PUBLIC_APP_URL": "https://app.echoray.io",
 		"NEXT_PUBLIC_WEB_URL": "https://echoray.io"
 	}

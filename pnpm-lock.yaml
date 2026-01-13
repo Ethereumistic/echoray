@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@opennextjs/cloudflare':
-        specifier: ^1.14.4
-        version: 1.14.8(next@15.5.9(react-dom@19.1.4(react@19.1.4))(react@19.1.4))(wrangler@4.59.1)
       '@radix-ui/react-accordion':
         specifier: ^1.2.12
         version: 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.8))(@types/react@19.2.8)(react-dom@19.1.4(react@19.1.4))(react@19.1.4)
@@ -108,6 +105,9 @@ importers:
       '@eslint/eslintrc':
         specifier: ^3
         version: 3.3.3
+      '@opennextjs/cloudflare':
+        specifier: ^1.14.8
+        version: 1.14.8(next@15.5.9(react-dom@19.1.4(react@19.1.4))(react@19.1.4))(wrangler@4.59.1)
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.1.18
@@ -4474,7 +4474,7 @@ snapshots:
       '@aws-crypto/sha256-js': 3.0.0
       '@aws-crypto/supports-web-crypto': 3.0.0
       '@aws-crypto/util': 3.0.0
-      '@aws-sdk/types': 3.398.0
+      '@aws-sdk/types': 3.965.0
       '@aws-sdk/util-locate-window': 3.965.0
       '@aws-sdk/util-utf8-browser': 3.259.0
       tslib: 1.14.1
@@ -4492,7 +4492,7 @@ snapshots:
   '@aws-crypto/sha256-js@3.0.0':
     dependencies:
       '@aws-crypto/util': 3.0.0
-      '@aws-sdk/types': 3.398.0
+      '@aws-sdk/types': 3.965.0
       tslib: 1.14.1
 
   '@aws-crypto/sha256-js@5.2.0':
@@ -4511,7 +4511,7 @@ snapshots:
 
   '@aws-crypto/util@3.0.0':
     dependencies:
-      '@aws-sdk/types': 3.398.0
+      '@aws-sdk/types': 3.965.0
       '@aws-sdk/util-utf8-browser': 3.259.0
       tslib: 1.14.1
 
