@@ -21,6 +21,10 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
 	title: "Echoray | Digital Excellence",
 	description: "Bringing clarity and understanding to the web's complexity.",
+	icons: {
+		icon: "/favicon.ico",
+		apple: "/apple-icon.png",
+	},
 };
 
 export default function RootLayout({
@@ -30,9 +34,6 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en">
-			<head>
-				<link rel="icon" href="/favicon.svg" type="image/svg+xml"></link>
-			</head>
 			<body className={`${sans.variable} ${serif.variable} ${mono.variable} font-sans dark antialiased`}>{children}</body>
 		</html>
 	);

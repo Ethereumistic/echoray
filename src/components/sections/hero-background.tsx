@@ -101,21 +101,12 @@ const TracingLine = ({ path, delay, duration, reverse = false, totalCycle }: {
                     opacity: [0, 0.4, 0.4, 0]
                 }}
                 transition={{
-                    pathOffset: {
-                        duration: duration,
-                        repeat: Infinity,
-                        repeatDelay: totalCycle - duration,
-                        delay: delay,
-                        ease: "linear"
-                    },
-                    opacity: {
-                        duration: duration,
-                        times: [0, 0.05, 0.95, 1],
-                        repeat: Infinity,
-                        repeatDelay: totalCycle - duration,
-                        delay: delay,
-                        ease: "linear"
-                    }
+                    duration: duration,
+                    repeat: Infinity,
+                    repeatDelay: totalCycle - duration,
+                    delay: delay,
+                    ease: "linear",
+                    opacity: { times: [0, 0.05, 0.95, 1], duration: duration }
                 }}
                 style={{
                     filter: "blur(0.5rem) brightness(1.5)",
@@ -129,30 +120,21 @@ const TracingLine = ({ path, delay, duration, reverse = false, totalCycle }: {
                 strokeWidth="1"
                 fill="none"
                 initial={{
-                    pathLength: 0.12,
-                    pathOffset: reverse ? 1 : -0.12,
+                    pathLength: 0.1,
+                    pathOffset: reverse ? 1 : -0.1,
                     opacity: 0
                 }}
                 animate={{
-                    pathOffset: reverse ? -0.12 : 1,
+                    pathOffset: reverse ? -0.1 : 1,
                     opacity: [0, 1, 1, 0]
                 }}
                 transition={{
-                    pathOffset: {
-                        duration: duration,
-                        repeat: Infinity,
-                        repeatDelay: totalCycle - duration,
-                        delay: delay,
-                        ease: "linear"
-                    },
-                    opacity: {
-                        duration: duration,
-                        times: [0, 0.05, 0.95, 1],
-                        repeat: Infinity,
-                        repeatDelay: totalCycle - duration,
-                        delay: delay,
-                        ease: "linear"
-                    }
+                    duration: duration,
+                    repeat: Infinity,
+                    repeatDelay: totalCycle - duration,
+                    delay: delay,
+                    ease: "linear",
+                    opacity: { times: [0, 0.05, 0.95, 1], duration: duration }
                 }}
                 style={{
                     filter: "drop-shadow(0 0 0.5rem var(--primary))",
@@ -173,18 +155,10 @@ const TechBubble = ({ Icon, x, y, duration, delay, totalCycle, reverse = false }
     reverse?: boolean
 }) => {
     const progress = x / 1000
-
-    // Precise timing: head reaches progress at (dist / total_dist) * duration
-    // total_dist is 1 + pathLength = 1.12
-    const timeAtX = reverse
-        ? ((1 - progress) / 1.12) * duration
-        : (progress / 1.12) * duration
-
-    // Duration the 0.12 length tracer spends over a single point
-    const glowDuration = (0.12 / 1.12) * duration
+    const timeAtX = reverse ? (1 - progress) * duration : progress * duration
 
     // Pulse peak timing (sync with streak)
-    let pulseDelay = (delay + timeAtX) % totalCycle
+    let pulseDelay = (delay + timeAtX - 1.25) % totalCycle
     if (pulseDelay < 0) pulseDelay += totalCycle
 
     return (
@@ -200,15 +174,14 @@ const TechBubble = ({ Icon, x, y, duration, delay, totalCycle, reverse = false }
             <motion.div
                 className="absolute inset-0 rounded-full bg-primary/40 blur-[1.5rem]"
                 animate={{
-                    opacity: [0, 1, 1, 0],
-                    scale: [0.8, 1.8, 0.8]
+                    scale: [0.8, 2.2, 0.8],
+                    opacity: [0, 0.7, 0]
                 }}
                 transition={{
-                    duration: glowDuration,
+                    duration: 2.5,
                     repeat: Infinity,
-                    repeatDelay: totalCycle - glowDuration,
+                    repeatDelay: totalCycle - 2.5,
                     delay: pulseDelay,
-                    times: [0, 0.1, 0.9, 1]
                 }}
             />
 

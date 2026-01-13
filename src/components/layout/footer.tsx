@@ -30,10 +30,9 @@ export function Footer() {
                     <div>
                         <h4 className="mb-4 text-sm font-semibold uppercase tracking-wider">Services</h4>
                         <ul className="space-y-2 text-sm text-muted-foreground">
-                            <li><Link href="/services/websites" className="hover:text-primary transition-colors">Simple Websites</Link></li>
-                            <li><Link href="/services/web-apps" className="hover:text-primary transition-colors">Web Applications</Link></li>
-                            <li><Link href="/services/crm" className="hover:text-primary transition-colors">Enterprise CRMs</Link></li>
-                            <li><Link href="/services/consulting" className="hover:text-primary transition-colors">IT Consulting</Link></li>
+                            <li><Link href="/services/websites" className="hover:text-primary transition-colors">Professional Websites</Link></li>
+                            <li><Link href="/services/web-apps" className="hover:text-primary transition-colors">Custom Web Apps</Link></li>
+                            <li><Link href="/services/crm" className="hover:text-primary transition-colors">Business Systems</Link></li>
                         </ul>
                     </div>
 
