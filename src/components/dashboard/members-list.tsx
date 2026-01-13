@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuthStore } from "@/stores/auth-store"
-import { usePermissions } from "@/hooks/use-permissions"
 import {
     Table,
     TableBody,
@@ -23,11 +22,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { MoreHorizontal, UserPlus, Shield, UserMinus, ShieldAlert } from "lucide-react"
+import { MoreHorizontal, Shield, UserMinus, ShieldAlert } from "lucide-react"
 import { toast } from "sonner"
 import { PermissionGuard } from "./permission-guard"
 import { InviteMemberDialog } from "./invite-member-dialog"
 import { MemberRolesDialog } from "./member-roles-dialog"
+
+import { Role, MemberWithRoles } from "@/types/permissions"
+import { useCallback } from "react"
 
 /**
  * MembersList component shows a table of all members in the current active org.
@@ -36,21 +38,20 @@ import { MemberRolesDialog } from "./member-roles-dialog"
 export function MembersList() {
     const supabase = createClient()
     const { activeOrganization } = useAuthStore()
-    const { can } = usePermissions()
-    const [members, setMembers] = useState<any[]>([])
+    const [members, setMembers] = useState<(MemberWithRoles & { member_roles: { role: Role }[] })[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
-    const fetchMembers = async () => {
+    const fetchMembers = useCallback(async () => {
         if (!activeOrganization) return
 
         setIsLoading(true)
         try {
-            // Fetch members with profiles and roles
+            // Fetch members with profiles (as 'user') and roles
             const { data, error } = await supabase
                 .from('organization_members')
                 .select(`
                     *,
-                    profile:profiles(
+                    user:profiles(
                         id,
                         full_name,
                         username,
@@ -72,24 +73,25 @@ export function MembersList() {
                         .eq('organization_id', activeOrganization.id)
 
                     if (fallbackError) throw fallbackError
-                    setMembers(fallbackData || [])
+                    setMembers((fallbackData || []) as (MemberWithRoles & { member_roles: { role: Role }[] })[])
                     toast.warning("Members loaded without profiles due to schema sync lag.")
                     return
                 }
                 throw error
             }
-            setMembers(data || [])
-        } catch (err: any) {
+            setMembers((data || []) as (MemberWithRoles & { member_roles: { role: Role }[] })[])
+        } catch (err) {
             console.error("Caught Exception in fetchMembers:", err)
-            toast.error(err.message || "Failed to load members")
+            const message = err instanceof Error ? err.message : "Failed to load members"
+            toast.error(message)
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [activeOrganization, supabase])
 
     useEffect(() => {
         fetchMembers()
-    }, [activeOrganization?.id])
+    }, [fetchMembers])
 
     const handleRemoveMember = async (userId: string) => {
         if (!activeOrganization) return
@@ -104,8 +106,9 @@ export function MembersList() {
 
             toast.success("Member removed")
             fetchMembers()
-        } catch (err: any) {
-            toast.error(err.message || "Failed to remove member")
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Failed to remove member"
+            toast.error(message)
         }
     }
 
@@ -153,23 +156,23 @@ export function MembersList() {
                                 <TableRow key={member.id}>
                                     <TableCell className="flex items-center gap-3">
                                         <Avatar className="h-8 w-8">
-                                            <AvatarImage src={member.profile?.avatar_url} />
+                                            <AvatarImage src={member.user?.avatar_url} />
                                             <AvatarFallback>
-                                                {member.profile?.full_name?.charAt(0) || "?"}
+                                                {member.user?.full_name?.charAt(0) || "?"}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="flex flex-col">
                                             <span className="font-medium text-sm">
-                                                {member.profile?.full_name || "Unknown User"}
+                                                {member.user?.full_name || "Unknown User"}
                                             </span>
                                             <span className="text-xs text-muted-foreground lowercase">
-                                                {member.profile?.username || "user"}
+                                                {member.user?.username || "user"}
                                             </span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1">
-                                            {member.member_roles?.map((mr: any) => (
+                                            {member.member_roles?.map((mr: { role: Role }) => (
                                                 <Badge
                                                     key={mr.role.id}
                                                     variant="secondary"

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { Loader2, Save } from "lucide-react"
+import { organizationSchema, type OrganizationFormValues } from "@/lib/validations"
 
 /**
  * Form to manage the current active organization's settings.
@@ -28,9 +29,28 @@ export function OrgSettingsForm() {
         }
     }, [activeOrganization])
 
+    const [errors, setErrors] = useState<Partial<Record<keyof OrganizationFormValues, string>>>({})
+
     const handleUpdate = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!activeOrganization) return
+
+        setErrors({})
+        const validation = organizationSchema.safeParse({
+            name,
+            slug: activeOrganization.slug,
+            description
+        })
+
+        if (!validation.success) {
+            const fieldErrors: Partial<Record<keyof OrganizationFormValues, string>> = {}
+            validation.error.issues.forEach(issue => {
+                const path = issue.path[0] as keyof OrganizationFormValues
+                fieldErrors[path] = issue.message
+            })
+            setErrors(fieldErrors)
+            return
+        }
 
         setIsLoading(true)
         try {
@@ -49,9 +69,10 @@ export function OrgSettingsForm() {
 
             toast.success("Organization updated successfully")
             setActiveOrganization(data)
-        } catch (err: any) {
+        } catch (err) {
             console.error("Error updating organization:", err)
-            toast.error(err.message || "Failed to update organization")
+            const message = err instanceof Error ? err.message : "Failed to update organization"
+            toast.error(message)
         } finally {
             setIsLoading(false)
         }
@@ -71,7 +92,7 @@ export function OrgSettingsForm() {
                 <CardHeader>
                     <CardTitle>Global Settings</CardTitle>
                     <CardDescription>
-                        Manage your organization's public profile and basic information.
+                        Manage your organization&apos;s public profile and basic information.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -80,9 +101,14 @@ export function OrgSettingsForm() {
                         <Input
                             id="org-name"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={(e) => {
+                                setName(e.target.value)
+                                if (errors.name) setErrors(prev => ({ ...prev, name: undefined }))
+                            }}
                             required
+                            className={errors.name ? "border-destructive focus-visible:ring-destructive" : ""}
                         />
+                        {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="org-slug">Slug</Label>
@@ -101,9 +127,13 @@ export function OrgSettingsForm() {
                         <Textarea
                             id="org-description"
                             value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            className="min-h-[100px] bg-background/50"
+                            onChange={(e) => {
+                                setDescription(e.target.value)
+                                if (errors.description) setErrors(prev => ({ ...prev, description: undefined }))
+                            }}
+                            className={`min-h-[100px] bg-background/50 ${errors.description ? "border-destructive focus-visible:ring-destructive" : ""}`}
                         />
+                        {errors.description && <p className="text-xs text-destructive">{errors.description}</p>}
                     </div>
                 </CardContent>
                 <CardFooter className="flex justify-end border-t border-border/50 pt-6">

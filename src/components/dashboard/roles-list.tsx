@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuthStore } from "@/stores/auth-store"
-import { usePermissions } from "@/hooks/use-permissions"
+import { Role } from "@/types/permissions"
+import { useCallback } from "react"
 import {
     Table,
     TableBody,
@@ -32,10 +33,10 @@ import {
 export function RolesList() {
     const supabase = createClient()
     const { activeOrganization } = useAuthStore()
-    const [roles, setRoles] = useState<any[]>([])
+    const [roles, setRoles] = useState<Role[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
-    const fetchRoles = async () => {
+    const fetchRoles = useCallback(async () => {
         if (!activeOrganization) return
 
         setIsLoading(true)
@@ -48,17 +49,17 @@ export function RolesList() {
 
             if (error) throw error
             setRoles(data || [])
-        } catch (err: any) {
+        } catch (err) {
             console.error("Error fetching roles:", err)
             toast.error("Failed to load roles")
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [activeOrganization, supabase])
 
     useEffect(() => {
         fetchRoles()
-    }, [activeOrganization?.id])
+    }, [fetchRoles])
 
     const handleSetDefault = async (roleId: string) => {
         if (!activeOrganization) return
@@ -82,8 +83,10 @@ export function RolesList() {
 
             toast.success("Default role updated")
             fetchRoles()
-        } catch (err: any) {
-            toast.error(err.message || "Failed to update default role")
+        } catch (err) {
+            console.error("Error updating default role:", err)
+            const message = err instanceof Error ? err.message : "Failed to update default role"
+            toast.error(message)
         }
     }
 

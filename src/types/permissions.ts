@@ -108,6 +108,7 @@ export interface MemberWithRoles extends OrganizationMember {
         id: string;
         email: string;
         full_name?: string;
+        username?: string;
         avatar_url?: string;
     };
     roles: Role[];

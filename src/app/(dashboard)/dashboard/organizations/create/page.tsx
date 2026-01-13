@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { useAuthStore } from "@/stores/auth-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from "sonner"
 import { Building2, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { organizationSchema, type OrganizationFormValues } from "@/lib/validations"
 
 /**
  * Page to create a new organization.
@@ -20,30 +20,53 @@ import Link from "next/link"
 export default function CreateOrganizationPage() {
     const router = useRouter()
     const supabase = createClient()
-    const { user, setActiveOrganization } = useAuthStore()
+    // No auth store variables needed currently
     const [isLoading, setIsLoading] = useState(false)
     const [name, setName] = useState("")
     const [slug, setSlug] = useState("")
     const [description, setDescription] = useState("")
+    const [errors, setErrors] = useState<Partial<Record<keyof OrganizationFormValues, string>>>({})
 
     // Simple slugification
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value
         setName(val)
+
+        // Clear error if it exists
+        if (errors.name) {
+            setErrors(prev => ({ ...prev, name: undefined }))
+        }
+
         // Only auto-generate slug if it was empty or matched the previous name conversion
-        setSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''))
+        const suggestedSlug = val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+        setSlug(suggestedSlug)
+
+        // Clear slug error if it exists
+        if (errors.slug) {
+            setErrors(prev => ({ ...prev, slug: undefined }))
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!name || !slug) {
-            toast.error("Name and Slug are required")
+        setErrors({})
+
+        const validation = organizationSchema.safeParse({ name, slug, description })
+
+        if (!validation.success) {
+            const fieldErrors: Partial<Record<keyof OrganizationFormValues, string>> = {}
+            validation.error.issues.forEach(issue => {
+                const path = issue.path[0] as keyof OrganizationFormValues
+                if (!fieldErrors[path]) fieldErrors[path] = issue.message
+            })
+            setErrors(fieldErrors)
+            toast.error("Please fix the validation errors")
             return
         }
 
         setIsLoading(true)
         try {
-            const { data: orgId, error } = await supabase.rpc('create_organization', {
+            const { error } = await supabase.rpc('create_organization', {
                 p_name: name,
                 p_slug: slug,
                 p_description: description || null,
@@ -57,9 +80,10 @@ export default function CreateOrganizationPage() {
             // Redirect to dashboard
             router.push("/dashboard")
             router.refresh()
-        } catch (err: any) {
+        } catch (err) {
             console.error("Error creating organization:", err)
-            toast.error(err.message || "Failed to create organization")
+            const message = err instanceof Error ? err.message : "Failed to create organization"
+            toast.error(message)
         } finally {
             setIsLoading(false)
         }
@@ -94,44 +118,56 @@ export default function CreateOrganizationPage() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="space-y-2">
-                            <Label htmlFor="name">Organization Name</Label>
+                            <Label htmlFor="name" className={errors.name ? "text-destructive" : ""}>Organization Name</Label>
                             <Input
                                 id="name"
                                 placeholder="Echoray Ltd"
                                 value={name}
                                 onChange={handleNameChange}
                                 required
-                                className="bg-background/50"
+                                className={`bg-background/50 ${errors.name ? "border-destructive focus-visible:ring-destructive" : ""}`}
                             />
+                            {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="slug">Workspace Slug</Label>
+                            <Label htmlFor="slug" className={errors.slug ? "text-destructive" : ""}>Workspace Slug</Label>
                             <div className="flex items-center gap-2">
                                 <span className="text-muted-foreground text-sm font-mono">echoray.io/o/</span>
                                 <Input
                                     id="slug"
                                     placeholder="echoray-ltd"
                                     value={slug}
-                                    onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ''))}
+                                    onChange={(e) => {
+                                        setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ''))
+                                        if (errors.slug) setErrors(prev => ({ ...prev, slug: undefined }))
+                                    }}
                                     required
-                                    className="bg-background/50 font-mono"
+                                    className={`bg-background/50 font-mono ${errors.slug ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                 />
                             </div>
-                            <p className="text-[10px] text-muted-foreground">
-                                This will be used in your unique URL. Only lowercase letters, numbers, and hyphens.
-                            </p>
+                            {errors.slug ? (
+                                <p className="text-xs text-destructive">{errors.slug}</p>
+                            ) : (
+                                <p className="text-[10px] text-muted-foreground">
+                                    This will be used in your unique URL. Only lowercase letters, numbers, and hyphens.
+                                </p>
+                            )}
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="description">Description (Optional)</Label>
+                            <Label htmlFor="description" className={errors.description ? "text-destructive" : ""}>Description (Optional)</Label>
                             <Textarea
                                 id="description"
                                 placeholder="A brief description of your organization's purpose."
                                 value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                className="min-h-[100px] bg-background/50 resize-none"
+                                onChange={(e) => {
+                                    setDescription(e.target.value)
+                                    if (errors.description) setErrors(prev => ({ ...prev, description: undefined }))
+                                }}
+                                className={`min-h-[100px] bg-background/50 resize-none ${errors.description ? "border-destructive focus-visible:ring-destructive" : ""}`}
                             />
+                            {errors.description && <p className="text-xs text-destructive">{errors.description}</p>}
                         </div>
                     </CardContent>
                     <CardFooter className="flex justify-end gap-2 border-t border-border/50 pt-6">

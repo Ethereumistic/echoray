@@ -50,7 +50,7 @@ import {
     CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useAuthStore, type UserRole } from "@/stores/auth-store"
+import { useAuthStore } from "@/stores/auth-store"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Image from "next/image"

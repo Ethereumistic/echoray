@@ -20,7 +20,7 @@ export function PermissionGuard({
     fallback = null,
     children
 }: PermissionGuardProps) {
-    const { can, canAll, canAny, isLoading } = usePermissions()
+    const { canAll, canAny, isLoading } = usePermissions()
 
     if (isLoading) {
         return null // Or a small loader

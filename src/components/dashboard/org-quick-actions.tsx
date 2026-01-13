@@ -6,7 +6,6 @@ import {
     UserPlus,
     Shield,
     Settings,
-    LayoutDashboard,
     PlusCircle,
     ArrowRight
 } from "lucide-react"

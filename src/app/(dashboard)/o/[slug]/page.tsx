@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,7 +15,6 @@ import { createClient } from "@/lib/supabase/client"
  */
 export default function OrganizationDashboardPage() {
     const { slug } = useParams()
-    const router = useRouter()
     const {
         organizations,
         activeOrganization,
@@ -25,7 +24,6 @@ export default function OrganizationDashboardPage() {
     const [isSwitching, setIsSwitching] = useState(false)
     const [stats, setStats] = useState({ members: 0, projects: 0 })
     const supabase = createClient()
-
     useEffect(() => {
         if (!slug || isAuthLoading) return
 
@@ -42,7 +40,7 @@ export default function OrganizationDashboardPage() {
                 console.error("Organization not found or access denied")
             }
         }
-    }, [slug, organizations, activeOrganization, isAuthLoading])
+    }, [slug, organizations, activeOrganization, isAuthLoading, setActiveOrganization])
 
     useEffect(() => {
         if (!activeOrganization) return
@@ -59,7 +57,7 @@ export default function OrganizationDashboardPage() {
         }
 
         fetchStats()
-    }, [activeOrganization?.id])
+    }, [activeOrganization, supabase])
 
     if (isAuthLoading || isSwitching) {
         return (

@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuthStore } from "@/stores/auth-store"
 import { getMemberPermissions } from "@/lib/supabase/permissions"
+import { Organization } from "@/types/permissions"
 
 /**
  * OrgInitializer is a hidden component that manages organization and permission state.
@@ -35,7 +36,7 @@ export function OrgInitializer() {
 
                 if (error) throw error
 
-                const orgs = (members?.map(m => m.organizations) || []) as any[]
+                const orgs = (members?.map(m => m.organizations) || []) as Organization[]
                 setOrganizations(orgs)
 
                 // 2. Determine active organization
@@ -63,7 +64,7 @@ export function OrgInitializer() {
         }
 
         initOrgs()
-    }, [user?.id]) // Re-run if user changes
+    }, [user, activeOrganization, setActiveOrganization, setLoading, setOrganizations, setPermissions, supabase]) // Re-run if user or context changes
 
     // Watch for active organization changes to refresh permissions
     useEffect(() => {
@@ -75,7 +76,7 @@ export function OrgInitializer() {
         }
 
         refreshPermissions()
-    }, [activeOrganization?.id])
+    }, [activeOrganization, setPermissions, supabase, user])
 
     return null // Hidden component
 }

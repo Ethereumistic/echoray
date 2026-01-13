@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/select"
 import { UserPlus, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { inviteMemberSchema, type InviteMemberFormValues } from "@/lib/validations"
+import { Role } from "@/types/permissions"
 
 interface InviteMemberDialogProps {
     onSuccess?: () => void
@@ -37,10 +39,11 @@ export function InviteMemberDialog({ onSuccess }: InviteMemberDialogProps) {
     const { activeOrganization } = useAuthStore()
     const [isOpen, setIsOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-    const [roles, setRoles] = useState<any[]>([])
+    const [roles, setRoles] = useState<Role[]>([])
 
     const [email, setEmail] = useState("")
     const [selectedRoleId, setSelectedRoleId] = useState<string>("")
+    const [errors, setErrors] = useState<Partial<Record<keyof InviteMemberFormValues, string>>>({})
 
     useEffect(() => {
         if (isOpen && activeOrganization) {
@@ -61,11 +64,24 @@ export function InviteMemberDialog({ onSuccess }: InviteMemberDialogProps) {
             }
             fetchRoles()
         }
-    }, [isOpen, activeOrganization?.id])
+    }, [isOpen, activeOrganization, supabase])
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!activeOrganization || !email || !selectedRoleId) return
+        if (!activeOrganization) return
+
+        setErrors({})
+        const validation = inviteMemberSchema.safeParse({ email, roleIds: [selectedRoleId] })
+
+        if (!validation.success) {
+            const fieldErrors: Partial<Record<keyof InviteMemberFormValues, string>> = {}
+            validation.error.issues.forEach(issue => {
+                const path = issue.path[0] as keyof InviteMemberFormValues
+                fieldErrors[path] = issue.message
+            })
+            setErrors(fieldErrors)
+            return
+        }
 
         setIsLoading(true)
         try {
@@ -81,9 +97,10 @@ export function InviteMemberDialog({ onSuccess }: InviteMemberDialogProps) {
             setIsOpen(false)
             setEmail("")
             onSuccess?.()
-        } catch (err: any) {
+        } catch (err) {
             console.error("Invitation error:", err)
-            toast.error(err.message || "Failed to send invitation")
+            const message = err instanceof Error ? err.message : "Failed to send invitation"
+            toast.error(message)
         } finally {
             setIsLoading(false)
         }
@@ -113,15 +130,23 @@ export function InviteMemberDialog({ onSuccess }: InviteMemberDialogProps) {
                                 type="email"
                                 placeholder="colleague@example.com"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                onChange={(e) => {
+                                    setEmail(e.target.value)
+                                    if (errors.email) setErrors(prev => ({ ...prev, email: undefined }))
+                                }}
                                 required
+                                className={errors.email ? "border-destructive focus-visible:ring-destructive" : ""}
                             />
+                            {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="role">Initial Role</Label>
                             <Select
                                 value={selectedRoleId}
-                                onValueChange={setSelectedRoleId}
+                                onValueChange={(val) => {
+                                    setSelectedRoleId(val)
+                                    if (errors.roleIds) setErrors(prev => ({ ...prev, roleIds: undefined }))
+                                }}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a role" />
@@ -140,6 +165,7 @@ export function InviteMemberDialog({ onSuccess }: InviteMemberDialogProps) {
                                     ))}
                                 </SelectContent>
                             </Select>
+                            {errors.roleIds && <p className="text-xs text-destructive">{errors.roleIds}</p>}
                         </div>
                     </div>
                     <DialogFooter>

@@ -14,12 +14,14 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import { Shield, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
+import { Role, MemberWithRoles } from "@/types/permissions"
+import { useCallback } from "react"
 
 interface MemberRolesDialogProps {
-    member: any
+    member: MemberWithRoles & { member_roles?: { role: Role }[] }
     onSuccess?: () => void
     trigger?: React.ReactNode
 }
@@ -33,10 +35,9 @@ export function MemberRolesDialog({ member, onSuccess, trigger }: MemberRolesDia
     const [isOpen, setIsOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [isFetching, setIsFetching] = useState(false)
-    const [allRoles, setAllRoles] = useState<any[]>([])
+    const [allRoles, setAllRoles] = useState<Role[]>([])
     const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([])
-
-    const fetchRoles = async () => {
+    const fetchRoles = useCallback(async () => {
         if (!activeOrganization) return
         setIsFetching(true)
         try {
@@ -50,20 +51,20 @@ export function MemberRolesDialog({ member, onSuccess, trigger }: MemberRolesDia
             setAllRoles(data || [])
 
             // Set initial selected roles based on member's current roles
-            const initialIds = member.member_roles?.map((mr: any) => mr.role.id) || []
+            const initialIds = member.member_roles?.map((mr: { role: Role }) => mr.role.id) || []
             setSelectedRoleIds(initialIds)
         } catch (err) {
             console.error("Error fetching roles:", err)
         } finally {
             setIsFetching(false)
         }
-    }
+    }, [activeOrganization, member.member_roles, supabase])
 
     useEffect(() => {
         if (isOpen) {
             fetchRoles()
         }
-    }, [isOpen, activeOrganization?.id])
+    }, [isOpen, fetchRoles])
 
     const handleToggleRole = (roleId: string) => {
         setSelectedRoleIds(prev =>
@@ -86,12 +87,13 @@ export function MemberRolesDialog({ member, onSuccess, trigger }: MemberRolesDia
 
             if (error) throw error
 
-            toast.success(`Roles updated for ${member.profile?.full_name || 'member'}`)
+            toast.success(`Roles updated for ${member.user?.full_name || 'member'}`)
             setIsOpen(false)
             onSuccess?.()
-        } catch (err: any) {
+        } catch (err) {
             console.error("Error saving roles:", err)
-            toast.error(err.message || "Failed to update roles")
+            const message = err instanceof Error ? err.message : "Failed to update roles"
+            toast.error(message)
         } finally {
             setIsLoading(false)
         }
@@ -111,7 +113,7 @@ export function MemberRolesDialog({ member, onSuccess, trigger }: MemberRolesDia
                 <DialogHeader>
                     <DialogTitle>Edit Roles</DialogTitle>
                     <DialogDescription>
-                        Update roles for {member.profile?.full_name || 'this member'}. Changes take effect immediately.
+                        Update roles for {member.user?.full_name || 'this member'}. Changes take effect immediately.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -175,15 +177,3 @@ export function MemberRolesDialog({ member, onSuccess, trigger }: MemberRolesDia
     )
 }
 
-// Minimal Badge helper if not imported
-function Badge({ children, className, variant = "default" }: any) {
-    const variants: any = {
-        default: "bg-primary text-primary-foreground",
-        outline: "border border-border text-muted-foreground",
-    }
-    return (
-        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${variants[variant]} ${className}`}>
-            {children}
-        </span>
-    )
-}

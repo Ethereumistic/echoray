@@ -41,7 +41,7 @@ export default function OrgSettingsPage() {
                 setTimeout(() => setIsSwitching(false), 100)
             }
         }
-    }, [slug, organizations, activeOrganization, isAuthLoading])
+    }, [slug, organizations, activeOrganization, isAuthLoading, setActiveOrganization])
 
     const handleTabChange = (value: string) => {
         const params = new URLSearchParams(searchParams.toString())
@@ -95,7 +95,7 @@ export default function OrgSettingsPage() {
                             <CardHeader>
                                 <CardTitle>Workspace Identity</CardTitle>
                                 <CardDescription>
-                                    Update your organization's public profile and branding.
+                                    Update your organization&apos;s public profile and branding.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
