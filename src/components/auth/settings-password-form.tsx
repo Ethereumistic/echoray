@@ -32,8 +32,9 @@ export function SettingsPasswordForm() {
             setSuccess(true)
             setPassword('')
             setConfirmPassword('')
-        } catch (error: any) {
-            setError(error.message || 'An error occurred')
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'An error occurred'
+            setError(message)
         } finally {
             setIsLoading(false)
         }

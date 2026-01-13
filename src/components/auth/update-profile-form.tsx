@@ -34,7 +34,7 @@ export function UpdateProfileForm({ initialDisplayName = '' }: UpdateProfileForm
                 // You might want to use a toast here
                 console.log('Profile updated successfully')
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error updating profile:', error)
         } finally {
             setIsLoading(false)
