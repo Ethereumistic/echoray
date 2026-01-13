@@ -1,8 +1,9 @@
 import { Navbar } from "@/components/layout/navbar"
 import { Footer } from "@/components/layout/footer"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 
 import { ServicesGrid } from "@/components/sections/services-grid"
@@ -15,7 +16,10 @@ export default function ServicesPage() {
 
             {/* Hero Section */}
             <section className="container mx-auto px-4 py-24 text-center">
-                <h1 className="text-4xl font-bold tracking-tight sm:text-6xl mb-6">
+                <Badge variant="secondary" className="mb-6 px-4 py-1">
+                    Clear Digital Solutions
+                </Badge>
+                <h1 className="text-4xl font-bold tracking-tight sm:text-6xl mb-6 scroll-m-20">
                     We build the digital tools <br />
                     <span className="text-primary">your business needs to grow</span>
                 </h1>
@@ -48,38 +52,44 @@ export default function ServicesPage() {
                     </div>
 
                     <div className="grid gap-12 md:grid-cols-3">
-                        <div className="relative group p-8 rounded-3xl border border-muted bg-background/50 backdrop-blur-sm transition-all hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/5">
+                        <Card className="relative group p-8 rounded-3xl border border-muted bg-background/50 backdrop-blur-sm transition-all hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/5">
                             <div className="text-primary/20 font-bold text-8xl absolute -top-4 -left-4 select-none group-hover:text-primary/30 transition-colors">1</div>
-                            <div className="relative z-10">
-                                <h3 className="text-2xl font-bold mb-4">The Chat</h3>
+                            <CardHeader className="relative z-10 mb-2">
+                                <CardTitle className="text-2xl font-bold">The Chat</CardTitle>
+                            </CardHeader>
+                            <CardContent className="relative z-10">
                                 <p className="text-muted-foreground text-base leading-relaxed">
                                     We talk about your business, your problems, and what you actually need.
-                                    No "tech-talk", just real solutions.
+                                    No &quot;tech-talk&quot;, just real solutions.
                                 </p>
-                            </div>
-                        </div>
+                            </CardContent>
+                        </Card>
 
-                        <div className="relative group p-8 rounded-3xl border border-primary/20 bg-background/50 backdrop-blur-sm shadow-xl shadow-primary/5 transition-all hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10">
+                        <Card className="relative group p-8 rounded-3xl border border-primary/20 bg-background/50 backdrop-blur-sm shadow-xl shadow-primary/5 transition-all hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10">
                             <div className="text-primary/20 font-bold text-8xl absolute -top-4 -left-4 select-none group-hover:text-primary/30 transition-colors">2</div>
-                            <div className="relative z-10">
-                                <h3 className="text-2xl font-bold mb-4">The Blueprint</h3>
+                            <CardHeader className="relative z-10 mb-2">
+                                <CardTitle className="text-2xl font-bold">The Blueprint</CardTitle>
+                            </CardHeader>
+                            <CardContent className="relative z-10">
                                 <p className="text-muted-foreground text-base leading-relaxed">
-                                    We design exactly what we're going to build. You see it,
+                                    We design exactly what we&apos;re going to build. You see it,
                                     you approve it, and then we get to work.
                                 </p>
-                            </div>
-                        </div>
+                            </CardContent>
+                        </Card>
 
-                        <div className="relative group p-8 rounded-3xl border border-muted bg-background/50 backdrop-blur-sm transition-all hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/5">
+                        <Card className="relative group p-8 rounded-3xl border border-muted bg-background/50 backdrop-blur-sm transition-all hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/5">
                             <div className="text-primary/20 font-bold text-8xl absolute -top-4 -left-4 select-none group-hover:text-primary/30 transition-colors">3</div>
-                            <div className="relative z-10">
-                                <h3 className="text-2xl font-bold mb-4">The Launch</h3>
+                            <CardHeader className="relative z-10 mb-2">
+                                <CardTitle className="text-2xl font-bold">The Launch</CardTitle>
+                            </CardHeader>
+                            <CardContent className="relative z-10">
                                 <p className="text-muted-foreground text-base leading-relaxed">
-                                    We go live. But we don't leave you there—we guide you through
+                                    We go live. But we don&apos;t leave you there—we guide you through
                                     how to use it and make sure everything is perfect.
                                 </p>
-                            </div>
-                        </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
             </section>
@@ -117,26 +127,24 @@ export default function ServicesPage() {
             </section>
 
             {/* CTA Section */}
-            <section className="container mx-auto px-4 py-24">
-                <div className="bg-primary rounded-3xl p-8 md:p-16 text-center text-primary-foreground relative overflow-hidden group">
-                    <div className="relative z-10">
-                        <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to clear the fog?</h2>
-                        <p className="text-xl opacity-90 mb-10 max-w-2xl mx-auto">
-                            Stop wondering what digital tool you need. Let's have a quick
-                            conversation and find the best path for your business.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <Button size="lg" variant="secondary" className="px-8 text-lg font-bold" asChild>
-                                <Link href="/contact">Talk to a Guide</Link>
-                            </Button>
-                            <Button size="lg" variant="outline" className="px-8 text-lg font-bold border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary transition-colors" asChild>
-                                <Link href="/start-project">Start Your Project</Link>
-                            </Button>
-                        </div>
+            <section className="bg-primary py-24 text-primary-foreground overflow-hidden relative group">
+                <div className="container mx-auto px-4 text-center relative z-10">
+                    <h2 className="text-4xl font-bold tracking-tight sm:text-5xl mb-6">Ready to clear the fog?</h2>
+                    <p className="text-xl opacity-90 mb-10 max-w-2xl mx-auto">
+                        Stop wondering what digital tool you need. Let&apos;s have a quick
+                        conversation and find the best path for your business.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button size="lg" variant="secondary" className="px-8 text-lg font-bold" asChild>
+                            <Link href="/contact">Talk to a Guide</Link>
+                        </Button>
+                        <Button size="lg" variant="outline" className="px-8 text-lg font-bold border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary transition-colors" asChild>
+                            <Link href="/start-project">Start Your Project</Link>
+                        </Button>
                     </div>
-                    {/* Background Glow */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/20 blur-[120px] rounded-full pointer-events-none transition-transform group-hover:scale-110 duration-700"></div>
                 </div>
+                {/* Background Glow */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/20 blur-[120px] rounded-full pointer-events-none transition-transform group-hover:scale-110 duration-700"></div>
             </section>
 
             <Footer />
