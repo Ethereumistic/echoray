@@ -28,10 +28,7 @@
 		}
 	],
 	"vars": {
-		"NEXT_PUBLIC_SUPABASE_URL": "https://xwzhwrxsrbtoqvehmmjm.supabase.co",
-		"NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_N-oys_Lw0io9YA-9UofmJA_lNubn-_0",
-		"NEXT_PUBLIC_SUPABASE_KEY": "sb_publishable_N-oys_Lw0io9YA-9UofmJA_lNubn-_0",
-		"NEXT_PUBLIC_APP_URL": "https://app.echoray.io",
-		"NEXT_PUBLIC_WEB_URL": "https://echoray.io"
+		"NEXT_PUBLIC_WEB_URL": "https://echoray.io",
+		"NEXT_PUBLIC_CONVEX_URL": "https://fleet-puma-654.convex.cloud"
 	}
 }
