@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/collapsible"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuthStore } from "@/stores/auth-store"
-import { createClient } from "@/lib/supabase/client"
+import { useAuthActions } from "@convex-dev/auth/react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 
@@ -124,10 +124,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     } = useAuthStore()
     const { state, isMobile } = useSidebar()
     const isCollapsed = state === "collapsed"
+    const { signOut: convexSignOut } = useAuthActions()
 
     const handleSignOut = async () => {
-        const supabase = createClient()
-        await supabase.auth.signOut()
+        await convexSignOut()
         clearAuthStore()
         router.push("/")
     }
@@ -304,7 +304,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 </DropdownMenuLabel>
                                 {organizations?.map((org) => (
                                     <DropdownMenuItem
-                                        key={org.id}
+                                        key={org._id}
                                         onClick={() => {
                                             setActiveOrganization(org)
                                             router.push(`/o/${org.slug}`)
@@ -315,7 +315,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                             <Building2 className="size-3.5" />
                                         </div>
                                         <span className="text-sm font-medium">{org.name}</span>
-                                        {activeOrganization?.id === org.id && <Check className="ml-auto size-4 text-primary" />}
+                                        {activeOrganization?._id === org._id && <Check className="ml-auto size-4 text-primary" />}
                                     </DropdownMenuItem>
                                 ))}
                                 <DropdownMenuItem asChild className="gap-2 p-2 rounded-lg text-muted-foreground cursor-pointer">

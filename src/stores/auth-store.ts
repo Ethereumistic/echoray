@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { User, Session } from '@supabase/supabase-js'
-import type { Organization, OrganizationMember, Role } from '@/types/permissions'
+import type { Id } from '../../convex/_generated/dataModel'
 
 /**
  * User roles for role-based access control in the dashboard.
@@ -10,7 +9,26 @@ import type { Organization, OrganizationMember, Role } from '@/types/permissions
 export type UserRole = 'user' | 'admin' | 'client' | 'team_member'
 
 /**
- * User profile with extended information beyond Supabase user.
+ * Organization type matching Convex schema
+ */
+export interface Organization {
+    _id: Id<"organizations">
+    name: string
+    slug: string
+    description?: string
+    logoUrl?: string
+    ownerId: Id<"users">
+    subscriptionTierId: Id<"subscriptionTiers">
+    subscriptionStatus: 'active' | 'trialing' | 'past_due' | 'cancelled' | 'paused'
+    subscriptionStartedAt: number
+    subscriptionEndsAt?: number
+    customPermissions: number
+    customConfig?: any
+    metadata?: any
+}
+
+/**
+ * User profile with extended information.
  */
 export interface UserProfile {
     id: string
@@ -22,12 +40,44 @@ export interface UserProfile {
 }
 
 /**
+ * Role type matching Convex schema
+ */
+export interface Role {
+    _id: Id<"roles">
+    organizationId: Id<"organizations">
+    name: string
+    description?: string
+    color?: string
+    permissions: number
+    position: number
+    isSystemRole: boolean
+    systemRoleType?: 'owner' | 'admin' | 'moderator' | 'member'
+    isAssignable: boolean
+    isDefault: boolean
+}
+
+/**
+ * Organization member type
+ */
+export interface OrganizationMember {
+    _id: Id<"organizationMembers">
+    organizationId: Id<"organizations">
+    userId: Id<"users">
+    status: 'invited' | 'active' | 'suspended' | 'left'
+    invitedBy?: Id<"users">
+    invitedAt: number
+    joinedAt?: number
+    computedPermissions: number
+    permissionsLastComputedAt?: number
+    metadata?: any
+}
+
+/**
  * Auth store state interface.
  */
 interface AuthState {
     // State
-    user: User | null
-    session: Session | null
+    userId: string | null
     profile: UserProfile | null
     organizations: Organization[]
     activeOrganization: Organization | null
@@ -37,8 +87,7 @@ interface AuthState {
     isAuthenticated: boolean
 
     // Actions
-    setUser: (user: User | null) => void
-    setSession: (session: Session | null) => void
+    setUserId: (userId: string | null) => void
     setProfile: (profile: UserProfile | null) => void
     setOrganizations: (orgs: Organization[]) => void
     setActiveOrganization: (org: Organization | null) => void
@@ -59,8 +108,7 @@ export const useAuthStore = create<AuthState>()(
     persist(
         (set, get) => ({
             // Initial state
-            user: null,
-            session: null,
+            userId: null,
             profile: null,
             organizations: [],
             activeOrganization: null,
@@ -70,15 +118,12 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
 
             // Actions
-            setUser: (user) =>
+            setUserId: (userId) =>
                 set({
-                    user,
-                    isAuthenticated: !!user,
+                    userId,
+                    isAuthenticated: !!userId,
                     isLoading: false
                 }),
-
-            setSession: (session) =>
-                set({ session }),
 
             setProfile: (profile) =>
                 set({ profile }),
@@ -100,8 +145,7 @@ export const useAuthStore = create<AuthState>()(
 
             signOut: () =>
                 set({
-                    user: null,
-                    session: null,
+                    userId: null,
                     profile: null,
                     organizations: [],
                     activeOrganization: null,
@@ -120,7 +164,7 @@ export const useAuthStore = create<AuthState>()(
         {
             name: 'echoray-auth-storage',
             storage: createJSONStorage(() => localStorage),
-            // Persist profile and active org for faster initial renders
+            // Persist profile and active org settings for faster initial renders
             partialize: (state) => ({
                 profile: state.profile,
                 activeOrganization: state.activeOrganization,
@@ -132,19 +176,19 @@ export const useAuthStore = create<AuthState>()(
 )
 
 /**
- * Helper to extract user profile from Supabase user.
- * In a real app, you'd fetch additional profile data from a profiles table.
+ * Helper to create a profile from Convex user data
  */
-export function extractProfileFromUser(user: User): UserProfile {
-    // Get role from user metadata or default to 'user'
-    const role = (user.user_metadata?.role as UserRole) || 'user'
-
+export function createProfileFromConvexUser(user: {
+    id: string
+    email?: string
+    fullName?: string
+    avatarUrl?: string
+}): UserProfile {
     return {
         id: user.id,
         email: user.email,
-        role,
-        displayName: user.user_metadata?.display_name || user.email?.split('@')[0],
-        avatarUrl: user.user_metadata?.avatar_url,
-        createdAt: user.created_at,
+        role: 'user', // Default role, actual permissions come from the org
+        displayName: user.fullName || user.email?.split('@')[0],
+        avatarUrl: user.avatarUrl,
     }
 }

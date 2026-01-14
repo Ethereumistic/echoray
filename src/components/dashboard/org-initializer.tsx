@@ -1,19 +1,18 @@
 "use client"
 
 import { useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useQuery } from "convex/react"
 import { useAuthStore } from "@/stores/auth-store"
-import { getMemberPermissions } from "@/lib/supabase/permissions"
-import { Organization } from "@/types/permissions"
+import { api } from "../../../convex/_generated/api"
+import type { Organization } from "@/stores/auth-store"
 
 /**
  * OrgInitializer is a hidden component that manages organization and permission state.
  * It ensures the auth store is populated with the user's organizations and active org permissions.
  */
 export function OrgInitializer() {
-    const supabase = createClient()
     const {
-        user,
+        userId,
         setOrganizations,
         activeOrganization,
         setActiveOrganization,
@@ -21,62 +20,42 @@ export function OrgInitializer() {
         setLoading
     } = useAuthStore()
 
-    useEffect(() => {
-        if (!user) return
+    // Query organizations the user is a member of
+    const organizations = useQuery(
+        api.organizations.listMyOrganizations,
+        userId ? {} : "skip"
+    )
 
-        const initOrgs = async () => {
+    // Query permissions for the active organization
+    const permissions = useQuery(
+        api.permissions.getUserPermissions,
+        activeOrganization?._id ? { organizationId: activeOrganization._id } : "skip"
+    )
+
+    // Update organizations in store when query completes
+    useEffect(() => {
+        if (organizations === undefined) {
             setLoading(true)
-            try {
-                // 1. Fetch organizations where user is a member
-                const { data: members, error } = await supabase
-                    .from('organization_members')
-                    .select('*, organizations(*)')
-                    .eq('user_id', user.id)
-                    .eq('status', 'active')
-
-                if (error) throw error
-
-                const orgs = (members?.map(m => m.organizations) || []) as Organization[]
-                setOrganizations(orgs)
-
-                // 2. Determine active organization
-                let currentOrg = activeOrganization
-
-                // If no active org or the saved one is no longer in the list, pick the first one
-                if (!currentOrg || !orgs.find(o => o.id === currentOrg?.id)) {
-                    currentOrg = orgs.length > 0 ? orgs[0] : null
-                    setActiveOrganization(currentOrg)
-                }
-
-                // 3. Fetch permissions for the active organization
-                if (currentOrg) {
-                    const perms = await getMemberPermissions(supabase, currentOrg.id)
-                    setPermissions(perms)
-                } else {
-                    setPermissions({})
-                }
-
-            } catch (err) {
-                console.error("Failed to initialize organizations:", err)
-            } finally {
-                setLoading(false)
-            }
+            return
         }
 
-        initOrgs()
-    }, [user, activeOrganization, setActiveOrganization, setLoading, setOrganizations, setPermissions, supabase]) // Re-run if user or context changes
+        setLoading(false)
+        const orgs = (organizations || []) as Organization[]
+        setOrganizations(orgs)
 
-    // Watch for active organization changes to refresh permissions
+        // If no active org or the saved one is no longer in the list, pick the first one
+        if (!activeOrganization || !orgs.find(o => o._id === activeOrganization?._id)) {
+            const firstOrg = orgs.length > 0 ? orgs[0] : null
+            setActiveOrganization(firstOrg)
+        }
+    }, [organizations, activeOrganization, setActiveOrganization, setLoading, setOrganizations])
+
+    // Update permissions when they change
     useEffect(() => {
-        if (!user || !activeOrganization) return
-
-        const refreshPermissions = async () => {
-            const perms = await getMemberPermissions(supabase, activeOrganization.id)
-            setPermissions(perms)
+        if (permissions !== undefined) {
+            setPermissions(permissions)
         }
-
-        refreshPermissions()
-    }, [activeOrganization, setPermissions, supabase, user])
+    }, [permissions, setPermissions])
 
     return null // Hidden component
 }

@@ -27,7 +27,8 @@ export const metadata: Metadata = {
 	},
 };
 
-import { AuthProvider } from "@/components/providers/auth-provider";
+import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
+import { ConvexClientProvider } from "@/lib/convex";
 import { Toaster } from "@/components/ui/sonner";
 
 export default function RootLayout({
@@ -36,13 +37,15 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en">
-			<body className={`${sans.variable} ${serif.variable} ${mono.variable} font-sans dark antialiased`}>
-				<AuthProvider>
-					{children}
-					<Toaster position="top-right" expand={false} richColors />
-				</AuthProvider>
-			</body>
-		</html>
+		<ConvexAuthNextjsServerProvider>
+			<html lang="en">
+				<body className={`${sans.variable} ${serif.variable} ${mono.variable} font-sans dark antialiased`}>
+					<ConvexClientProvider>
+						{children}
+						<Toaster position="top-right" expand={false} richColors />
+					</ConvexClientProvider>
+				</body>
+			</html>
+		</ConvexAuthNextjsServerProvider>
 	);
 }

@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
+import { useQuery } from "convex/react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Activity, Users, FolderOpen, Loader2 } from "lucide-react"
 import { OrgQuickActions } from "@/components/dashboard/org-quick-actions"
-import { createClient } from "@/lib/supabase/client"
+import { api } from "../../../../../convex/_generated/api"
 
 /**
  * Organization-specific dashboard page.
@@ -22,8 +23,13 @@ export default function OrganizationDashboardPage() {
         isLoading: isAuthLoading
     } = useAuthStore()
     const [isSwitching, setIsSwitching] = useState(false)
-    const [stats, setStats] = useState({ members: 0, projects: 0 })
-    const supabase = createClient()
+
+    // Query member count
+    const members = useQuery(
+        api.members.listMembers,
+        activeOrganization?._id ? { organizationId: activeOrganization._id } : "skip"
+    )
+
     useEffect(() => {
         if (!slug || isAuthLoading) return
 
@@ -42,23 +48,6 @@ export default function OrganizationDashboardPage() {
         }
     }, [slug, organizations, activeOrganization, isAuthLoading, setActiveOrganization])
 
-    useEffect(() => {
-        if (!activeOrganization) return
-
-        const fetchStats = async () => {
-            const { count, error } = await supabase
-                .from('organization_members')
-                .select('*', { count: 'exact', head: true })
-                .eq('organization_id', activeOrganization.id)
-
-            if (!error) {
-                setStats(prev => ({ ...prev, members: count || 0 }))
-            }
-        }
-
-        fetchStats()
-    }, [activeOrganization, supabase])
-
     if (isAuthLoading || isSwitching) {
         return (
             <div className="flex h-[50vh] items-center justify-center">
@@ -75,6 +64,8 @@ export default function OrganizationDashboardPage() {
             </div>
         )
     }
+
+    const memberCount = members?.length || 0
 
     return (
         <div className="flex flex-col">
@@ -99,7 +90,7 @@ export default function OrganizationDashboardPage() {
                             <FolderOpen className="h-4 w-4 text-primary/70" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.projects}</div>
+                            <div className="text-2xl font-bold">0</div>
                             <p className="text-xs text-muted-foreground">
                                 Active projects in this workspace
                             </p>
@@ -112,7 +103,7 @@ export default function OrganizationDashboardPage() {
                             <Users className="h-4 w-4 text-primary/70" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.members}</div>
+                            <div className="text-2xl font-bold">{memberCount}</div>
                             <p className="text-xs text-muted-foreground">
                                 Active collaborators
                             </p>
@@ -125,9 +116,9 @@ export default function OrganizationDashboardPage() {
                             <Activity className="h-4 w-4 text-primary/70" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold capitalize">{activeOrganization.subscription_status}</div>
+                            <div className="text-2xl font-bold capitalize">{activeOrganization.subscriptionStatus}</div>
                             <p className="text-xs text-muted-foreground">
-                                {activeOrganization.subscription_tier_id ? 'Premium Plan' : 'Free Plan'}
+                                {activeOrganization.subscriptionTierId ? 'Premium Plan' : 'Free Plan'}
                             </p>
                         </CardContent>
                     </Card>

@@ -1,15 +1,18 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
+import { useAuthActions } from "@convex-dev/auth/react"
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/stores/auth-store'
 
 export function LogoutButton() {
   const router = useRouter()
+  const { signOut: convexSignOut } = useAuthActions()
+  const { signOut: clearStore } = useAuthStore()
 
   const logout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await convexSignOut()
+    clearStore()
     router.push('/auth/login')
   }
 

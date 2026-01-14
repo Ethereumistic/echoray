@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react"
+import { useQuery, useMutation } from "convex/react"
 import { useAuthStore } from "@/stores/auth-store"
 import {
     Table,
@@ -22,97 +22,52 @@ import {
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { MoreHorizontal, Shield, UserMinus, ShieldAlert } from "lucide-react"
+import { MoreHorizontal, Shield, UserMinus, ShieldAlert, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { PermissionGuard } from "./permission-guard"
 import { InviteMemberDialog } from "./invite-member-dialog"
 import { MemberRolesDialog } from "./member-roles-dialog"
+import { api } from "../../../convex/_generated/api"
 
-import { Role, MemberWithRoles } from "@/types/permissions"
-import { useCallback } from "react"
+import type { Role } from "@/stores/auth-store"
 
 /**
  * MembersList component shows a table of all members in the current active org.
  * It includes role badges and management actions.
  */
 export function MembersList() {
-    const supabase = createClient()
     const { activeOrganization } = useAuthStore()
-    const [members, setMembers] = useState<(MemberWithRoles & { member_roles: { role: Role }[] })[]>([])
-    const [isLoading, setIsLoading] = useState(true)
 
-    const fetchMembers = useCallback(async () => {
-        if (!activeOrganization) return
+    // Query members with Convex
+    const members = useQuery(
+        api.members.listMembers,
+        activeOrganization?._id ? { organizationId: activeOrganization._id } : "skip"
+    )
 
-        setIsLoading(true)
-        try {
-            // Fetch members with profiles (as 'user') and roles
-            const { data, error } = await supabase
-                .from('organization_members')
-                .select(`
-                    *,
-                    user:profiles(
-                        id,
-                        full_name,
-                        username,
-                        avatar_url
-                    ),
-                    member_roles(
-                        role:roles(*)
-                    )
-                `)
-                .eq('organization_id', activeOrganization.id)
-
-            if (error) {
-                console.error("Supabase Query Error:", error)
-                // If it's a join error, try fetching without profile as fallback so they see SOMETHING
-                if (error.message.includes("relationship")) {
-                    const { data: fallbackData, error: fallbackError } = await supabase
-                        .from('organization_members')
-                        .select(`*, member_roles(role:roles(*))`)
-                        .eq('organization_id', activeOrganization.id)
-
-                    if (fallbackError) throw fallbackError
-                    setMembers((fallbackData || []) as (MemberWithRoles & { member_roles: { role: Role }[] })[])
-                    toast.warning("Members loaded without profiles due to schema sync lag.")
-                    return
-                }
-                throw error
-            }
-            setMembers((data || []) as (MemberWithRoles & { member_roles: { role: Role }[] })[])
-        } catch (err) {
-            console.error("Caught Exception in fetchMembers:", err)
-            const message = err instanceof Error ? err.message : "Failed to load members"
-            toast.error(message)
-        } finally {
-            setIsLoading(false)
-        }
-    }, [activeOrganization, supabase])
-
-    useEffect(() => {
-        fetchMembers()
-    }, [fetchMembers])
+    const removeMember = useMutation(api.members.removeMember)
 
     const handleRemoveMember = async (userId: string) => {
         if (!activeOrganization) return
 
         try {
-            const { error } = await supabase.rpc('remove_member_from_organization', {
-                p_organization_id: activeOrganization.id,
-                p_user_id: userId
+            await removeMember({
+                organizationId: activeOrganization._id,
+                targetUserId: userId as any, // Type will be fixed when Convex regenerates
             })
-
-            if (error) throw error
-
             toast.success("Member removed")
-            fetchMembers()
         } catch (err) {
             const message = err instanceof Error ? err.message : "Failed to remove member"
             toast.error(message)
         }
     }
 
+    const refetch = () => {
+        // Convex queries are reactive, no manual refetch needed
+    }
+
     if (!activeOrganization) return null
+
+    const isLoading = members === undefined
 
     return (
         <div className="space-y-4">
@@ -124,7 +79,7 @@ export function MembersList() {
                     </p>
                 </div>
                 <PermissionGuard permission="members.invite">
-                    <InviteMemberDialog onSuccess={fetchMembers} />
+                    <InviteMemberDialog onSuccess={refetch} />
                 </PermissionGuard>
             </div>
 
@@ -142,18 +97,21 @@ export function MembersList() {
                         {isLoading ? (
                             <TableRow>
                                 <TableCell colSpan={4} className="h-24 text-center">
-                                    Loading members...
+                                    <div className="flex items-center justify-center gap-2">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Loading members...
+                                    </div>
                                 </TableCell>
                             </TableRow>
-                        ) : members.length === 0 ? (
+                        ) : !members || members.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={4} className="h-24 text-center">
                                     No members found.
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            members.map((member) => (
-                                <TableRow key={member.id}>
+                            members.map((member: any) => (
+                                <TableRow key={member._id}>
                                     <TableCell className="flex items-center gap-3">
                                         <Avatar className="h-8 w-8">
                                             <AvatarImage src={member.user?.avatar_url} />
@@ -166,7 +124,7 @@ export function MembersList() {
                                                 {member.user?.full_name || "Unknown User"}
                                             </span>
                                             <span className="text-xs text-muted-foreground lowercase">
-                                                {member.user?.username || "user"}
+                                                {member.user?.email || member.user?.username || "user"}
                                             </span>
                                         </div>
                                     </TableCell>
@@ -174,7 +132,7 @@ export function MembersList() {
                                         <div className="flex flex-wrap gap-1">
                                             {member.member_roles?.map((mr: { role: Role }) => (
                                                 <Badge
-                                                    key={mr.role.id}
+                                                    key={mr.role._id}
                                                     variant="secondary"
                                                     className="bg-primary/10 text-primary border-primary/20 text-[10px] uppercase font-bold"
                                                     style={mr.role.color ? { borderLeftColor: mr.role.color, borderLeftWidth: '3px' } : {}}
@@ -202,7 +160,7 @@ export function MembersList() {
                                                 <PermissionGuard permission="roles.manage">
                                                     <MemberRolesDialog
                                                         member={member}
-                                                        onSuccess={fetchMembers}
+                                                        onSuccess={refetch}
                                                         trigger={
                                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="gap-2">
                                                                 <Shield className="h-4 w-4" />
@@ -219,7 +177,7 @@ export function MembersList() {
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem
                                                         className="gap-2 text-destructive focus:bg-destructive focus:text-destructive-foreground"
-                                                        onClick={() => handleRemoveMember(member.user_id)}
+                                                        onClick={() => handleRemoveMember(member.userId)}
                                                     >
                                                         <UserMinus className="h-4 w-4" />
                                                         Remove from Team

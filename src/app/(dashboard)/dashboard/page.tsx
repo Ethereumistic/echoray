@@ -1,20 +1,34 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+"use client"
+
+import { useRouter } from 'next/navigation'
+import { useQuery } from 'convex/react'
+import { useConvexAuth } from 'convex/react'
 import { DashboardHeader } from '@/components/dashboard/header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { FolderOpen, FileText, Users, Clock } from 'lucide-react'
+import { FolderOpen, FileText, Users, Clock, Loader2 } from 'lucide-react'
+import { api } from '../../../../convex/_generated/api'
+import { useEffect } from 'react'
 
 /**
  * Dashboard overview page.
  * Shows a summary of the user's activity and quick actions.
  */
-export default async function DashboardPage() {
-    const supabase = await createClient()
-    const { data: { user }, error } = await supabase.auth.getUser()
+export default function DashboardPage() {
+    const router = useRouter()
+    const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth()
 
-    if (error || !user) {
-        redirect('/auth/login')
-    }
+    // Query current user
+    const currentUser = useQuery(
+        api.users.currentUser,
+        isAuthenticated ? {} : "skip"
+    )
+
+    // Redirect if not authenticated
+    useEffect(() => {
+        if (!isAuthLoading && !isAuthenticated) {
+            router.push('/auth/login')
+        }
+    }, [isAuthLoading, isAuthenticated, router])
 
     // Stats cards data - in a real app, fetch these from your database
     const stats = [
@@ -48,6 +62,17 @@ export default async function DashboardPage() {
         },
     ]
 
+    // Show loading while checking auth
+    if (isAuthLoading || !isAuthenticated) {
+        return (
+            <div className="flex h-[50vh] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
+
+    const displayName = currentUser?.fullName || currentUser?.email?.split('@')[0] || 'User'
+
     return (
         <div className="flex flex-col">
             <DashboardHeader
@@ -60,7 +85,7 @@ export default async function DashboardPage() {
                 <Card className="bg-linear-to-r from-primary/10 via-primary/5 to-transparent border-primary/20">
                     <CardHeader>
                         <CardTitle className="text-2xl">
-                            Welcome back, {user.user_metadata?.display_name || (typeof user.email === 'string' ? user.email.split('@')[0] : 'User')}! 👋
+                            Welcome back, {displayName}! 👋
                         </CardTitle>
                         <CardDescription>
                             Here&apos;s what&apos;s happening with your projects today.

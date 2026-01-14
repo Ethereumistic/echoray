@@ -1,0 +1,263 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
+
+/**
+ * Convex Schema for Echoray
+ * Migrated from Supabase PostgreSQL schema
+ * 
+ * Key differences from SQL:
+ * - Uses Convex's document-based storage instead of relational
+ * - IDs are Convex's built-in `_id` field
+ * - References use `v.id("tableName")` instead of foreign keys
+ * - No need for explicit indexes on _id fields
+ */
+
+// Subscription status enum values
+const subscriptionStatus = v.union(
+    v.literal("active"),
+    v.literal("trialing"),
+    v.literal("past_due"),
+    v.literal("cancelled"),
+    v.literal("paused")
+);
+
+// Member status enum values
+const memberStatus = v.union(
+    v.literal("invited"),
+    v.literal("active"),
+    v.literal("suspended"),
+    v.literal("left")
+);
+
+// System role types
+const systemRoleType = v.union(
+    v.literal("owner"),
+    v.literal("admin"),
+    v.literal("moderator"),
+    v.literal("member")
+);
+
+// Audit log action types
+const auditAction = v.union(
+    v.literal("role_created"),
+    v.literal("role_updated"),
+    v.literal("role_deleted"),
+    v.literal("role_assigned"),
+    v.literal("role_unassigned"),
+    v.literal("permission_granted"),
+    v.literal("permission_revoked"),
+    v.literal("addon_purchased"),
+    v.literal("addon_cancelled"),
+    v.literal("member_invited"),
+    v.literal("member_joined"),
+    v.literal("member_removed"),
+    v.literal("tier_upgraded"),
+    v.literal("tier_downgraded"),
+    v.literal("override_added"),
+    v.literal("override_removed")
+);
+
+export default defineSchema({
+    // Include Convex Auth tables (users, sessions, etc.)
+    ...authTables,
+
+    // User profiles - extends the auth users table
+    profiles: defineTable({
+        userId: v.id("users"), // Reference to auth user
+        email: v.optional(v.string()),
+        fullName: v.optional(v.string()),
+        username: v.optional(v.string()),
+        avatarUrl: v.optional(v.string()),
+        role: v.optional(v.string()), // Legacy role field
+    })
+        .index("by_userId", ["userId"])
+        .index("by_email", ["email"])
+        .index("by_username", ["username"]),
+
+    // Subscription Tiers
+    subscriptionTiers: defineTable({
+        name: v.string(), // 'user', 'web', 'app', 'crm'
+        slug: v.string(),
+        priceEur: v.number(),
+        isCustom: v.boolean(),
+        description: v.optional(v.string()),
+        basePermissions: v.number(), // Bitwise base permissions (stored as number, up to 53 bits safe)
+        features: v.optional(v.array(v.string())), // Marketing features list
+        maxMembers: v.optional(v.number()), // null = unlimited
+        maxOrganizations: v.number(),
+    })
+        .index("by_slug", ["slug"])
+        .index("by_name", ["name"]),
+
+    // Organizations
+    organizations: defineTable({
+        name: v.string(),
+        slug: v.string(),
+        description: v.optional(v.string()),
+        logoUrl: v.optional(v.string()),
+        website: v.optional(v.string()),
+
+        // Ownership
+        ownerId: v.id("users"),
+
+        // Subscription
+        subscriptionTierId: v.id("subscriptionTiers"),
+        subscriptionStatus: subscriptionStatus,
+        subscriptionStartedAt: v.number(), // Unix timestamp
+        subscriptionEndsAt: v.optional(v.number()),
+
+        // Custom tier config
+        customPermissions: v.number(),
+        customConfig: v.optional(v.any()),
+
+        // Metadata
+        metadata: v.optional(v.any()),
+    })
+        .index("by_slug", ["slug"])
+        .index("by_ownerId", ["ownerId"])
+        .index("by_subscriptionTierId", ["subscriptionTierId"]),
+
+    // Organization Members
+    organizationMembers: defineTable({
+        organizationId: v.id("organizations"),
+        userId: v.id("users"),
+
+        // Status
+        status: memberStatus,
+
+        // Invitation tracking
+        invitedBy: v.optional(v.id("users")),
+        invitedAt: v.number(), // Unix timestamp
+        joinedAt: v.optional(v.number()),
+
+        // Permissions cache
+        computedPermissions: v.number(), // Bitwise permissions
+        permissionsLastComputedAt: v.optional(v.number()),
+
+        // Metadata
+        metadata: v.optional(v.any()),
+    })
+        .index("by_organizationId", ["organizationId"])
+        .index("by_userId", ["userId"])
+        .index("by_org_user", ["organizationId", "userId"])
+        .index("by_status", ["status"]),
+
+    // System Permissions (seed data)
+    permissions: defineTable({
+        code: v.string(), // e.g., 'profile.view', 'analytics.view'
+        bitPosition: v.number(), // 0-63
+        name: v.string(),
+        description: v.optional(v.string()),
+        category: v.string(), // 'basic', 'analytics', 'export', etc.
+
+        // Tier requirements
+        minTier: v.optional(v.string()),
+        isAddon: v.boolean(),
+        addonPriceEur: v.optional(v.number()),
+
+        // Flags
+        isDangerous: v.boolean(),
+    })
+        .index("by_code", ["code"])
+        .index("by_bitPosition", ["bitPosition"])
+        .index("by_category", ["category"])
+        .index("by_isAddon", ["isAddon"]),
+
+    // Roles
+    roles: defineTable({
+        organizationId: v.id("organizations"),
+
+        // Role definition
+        name: v.string(),
+        description: v.optional(v.string()),
+        color: v.optional(v.string()), // Hex color
+
+        // Permissions (bitwise)
+        permissions: v.number(),
+
+        // Hierarchy
+        position: v.number(),
+
+        // System roles
+        isSystemRole: v.boolean(),
+        systemRoleType: v.optional(systemRoleType),
+
+        // Settings
+        isAssignable: v.boolean(),
+        isDefault: v.boolean(),
+    })
+        .index("by_organizationId", ["organizationId"])
+        .index("by_org_name", ["organizationId", "name"])
+        .index("by_org_position", ["organizationId", "position"])
+        .index("by_org_systemRole", ["organizationId", "isSystemRole"]),
+
+    // Member Roles (Many-to-Many)
+    memberRoles: defineTable({
+        memberId: v.id("organizationMembers"),
+        roleId: v.id("roles"),
+
+        // Assignment tracking
+        assignedBy: v.optional(v.id("users")),
+        assignedAt: v.number(), // Unix timestamp
+    })
+        .index("by_memberId", ["memberId"])
+        .index("by_roleId", ["roleId"])
+        .index("by_member_role", ["memberId", "roleId"]),
+
+    // Member Permission Overrides
+    memberPermissionOverrides: defineTable({
+        memberId: v.id("organizationMembers"),
+        permissionId: v.id("permissions"),
+
+        // Override type
+        allow: v.boolean(), // true = grant, false = deny
+
+        // Tracking
+        grantedBy: v.optional(v.id("users")),
+        reason: v.optional(v.string()),
+        expiresAt: v.optional(v.number()), // Unix timestamp
+    })
+        .index("by_memberId", ["memberId"])
+        .index("by_member_permission", ["memberId", "permissionId"]),
+
+    // Organization Addons
+    organizationAddons: defineTable({
+        organizationId: v.id("organizations"),
+        permissionId: v.id("permissions"),
+
+        // Purchase tracking
+        purchasedBy: v.optional(v.id("users")),
+        purchasedAt: v.number(), // Unix timestamp
+        expiresAt: v.optional(v.number()),
+
+        // Billing
+        pricePaidEur: v.optional(v.number()),
+        isActive: v.boolean(),
+    })
+        .index("by_organizationId", ["organizationId"])
+        .index("by_org_permission", ["organizationId", "permissionId"]),
+
+    // Audit Log
+    permissionAuditLog: defineTable({
+        organizationId: v.optional(v.id("organizations")),
+        actorId: v.optional(v.id("users")),
+
+        // Action
+        action: auditAction,
+
+        // Targets
+        targetUserId: v.optional(v.id("users")),
+        targetRoleId: v.optional(v.id("roles")),
+        targetPermissionId: v.optional(v.id("permissions")),
+
+        // Details
+        metadata: v.optional(v.any()),
+        ipAddress: v.optional(v.string()),
+        userAgent: v.optional(v.string()),
+    })
+        .index("by_organizationId", ["organizationId"])
+        .index("by_actorId", ["actorId"])
+        .index("by_targetUserId", ["targetUserId"])
+        .index("by_action", ["action"]),
+});

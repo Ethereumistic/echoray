@@ -1,33 +1,40 @@
-"use client"
-
 import { useAuthStore } from "@/stores/auth-store"
 import { PermissionCode } from "@/types/permissions"
 
 /**
- * usePermissions hook for client-side permission checks.
- * Leverages the cached permissions in the auth store.
+ * Custom hook for checking user permissions in the current organization.
+ * Works with the Zustand auth store which is populated by OrgInitializer.
  */
 export function usePermissions() {
     const { permissions, activeOrganization, isLoading } = useAuthStore()
 
+    /**
+     * Check if the user has a specific permission
+     */
     const can = (permission: PermissionCode): boolean => {
         return permissions[permission] === true
     }
 
-    const canAny = (...permissionCodes: PermissionCode[]): boolean => {
-        return permissionCodes.some(code => can(code))
+    /**
+     * Check if the user has any of the specified permissions
+     */
+    const canAny = (...permissionList: PermissionCode[]): boolean => {
+        return permissionList.some(p => permissions[p] === true)
     }
 
-    const canAll = (...permissionCodes: PermissionCode[]): boolean => {
-        return permissionCodes.every(code => can(code))
+    /**
+     * Check if the user has all of the specified permissions
+     */
+    const canAll = (...permissionList: PermissionCode[]): boolean => {
+        return permissionList.every(p => permissions[p] === true)
     }
 
     return {
         can,
         canAny,
         canAll,
-        activeOrganization,
+        permissions,
         isLoading,
-        permissions
+        hasActiveOrg: !!activeOrganization,
     }
 }

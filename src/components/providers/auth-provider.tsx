@@ -1,91 +1,57 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useAuthStore, extractProfileFromUser } from '@/stores/auth-store'
+import { useEffect } from 'react'
+import { useConvexAuth, useQuery } from 'convex/react'
+import { useAuthStore, createProfileFromConvexUser } from '@/stores/auth-store'
+import { api } from '../../../convex/_generated/api'
 
 interface AuthProviderProps {
     children: React.ReactNode
 }
 
 /**
- * AuthProvider component that manages Supabase auth state and syncs with Zustand store.
- * Wrap your app with this provider to enable auth state management.
+ * AuthProvider component that syncs Convex auth state with Zustand store.
+ * This ensures the UI updates reactively when auth state changes.
  */
 export function AuthProvider({ children }: AuthProviderProps) {
-    const { setUser, setSession, setProfile, setLoading, signOut } = useAuthStore()
+    const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth()
+    const { setUserId, setProfile, setLoading, signOut } = useAuthStore()
 
-    const initializeAuth = useCallback(async () => {
-        const supabase = createClient()
+    // Query current user when authenticated
+    const currentUser = useQuery(
+        api.users.currentUser,
+        isAuthenticated ? {} : "skip"
+    )
 
-        try {
-            // Get initial session
-            const { data: { session }, error } = await supabase.auth.getSession()
+    // Sync auth state with store
+    useEffect(() => {
+        if (isAuthLoading) {
+            setLoading(true)
+            return
+        }
 
-            if (error) {
-                console.error('Error getting session:', error)
-                signOut()
-                return
-            }
+        if (!isAuthenticated) {
+            signOut()
+            return
+        }
 
-            if (session?.user) {
-                setUser(session.user)
-                setSession(session)
-                setProfile(extractProfileFromUser(session.user))
-            } else {
-                signOut()
-            }
-        } catch (err) {
-            console.error('Error initializing auth:', err)
+        // Wait for user data
+        if (currentUser === undefined) {
+            return
+        }
+
+        if (currentUser) {
+            setUserId(currentUser.id)
+            setProfile(createProfileFromConvexUser({
+                id: currentUser.id,
+                email: currentUser.email,
+                fullName: currentUser.fullName,
+                avatarUrl: currentUser.avatarUrl,
+            }))
+        } else {
             signOut()
         }
-    }, [setUser, setSession, setProfile, signOut])
-
-    useEffect(() => {
-        const supabase = createClient()
-
-        // Initialize auth state
-        initializeAuth()
-
-        // Listen for auth state changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                console.log('Auth state changed:', event)
-
-                if (session?.user) {
-                    setUser(session.user)
-                    setSession(session)
-                    setProfile(extractProfileFromUser(session.user))
-                } else {
-                    signOut()
-                }
-
-                // Handle specific auth events
-                switch (event) {
-                    case 'SIGNED_IN':
-                        // User signed in
-                        break
-                    case 'SIGNED_OUT':
-                        // User signed out
-                        break
-                    case 'TOKEN_REFRESHED':
-                        // Token was refreshed
-                        break
-                    case 'USER_UPDATED':
-                        // User data was updated
-                        if (session?.user) {
-                            setProfile(extractProfileFromUser(session.user))
-                        }
-                        break
-                }
-            }
-        )
-
-        // Cleanup subscription on unmount
-        return () => {
-            subscription.unsubscribe()
-        }
-    }, [initializeAuth, setUser, setSession, setProfile, signOut, setLoading])
+    }, [isAuthenticated, isAuthLoading, currentUser, setUserId, setProfile, setLoading, signOut])
 
     return <>{children}</>
 }

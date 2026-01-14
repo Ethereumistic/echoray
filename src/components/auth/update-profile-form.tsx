@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useMutation } from 'convex/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAuthStore, extractProfileFromUser } from '@/stores/auth-store'
+import { useAuthStore, createProfileFromConvexUser } from '@/stores/auth-store'
+import { api } from '../../../convex/_generated/api'
+import { toast } from 'sonner'
 
 interface UpdateProfileFormProps {
     initialDisplayName?: string
@@ -14,28 +16,29 @@ interface UpdateProfileFormProps {
 export function UpdateProfileForm({ initialDisplayName = '' }: UpdateProfileFormProps) {
     const [displayName, setDisplayName] = useState(initialDisplayName)
     const [isLoading, setIsLoading] = useState(false)
-    const { setProfile } = useAuthStore()
+    const { setProfile, profile } = useAuthStore()
+
+    const updateDisplayName = useMutation(api.users.updateDisplayName)
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault()
-        const supabase = createClient()
         setIsLoading(true)
 
         try {
-            const { data: { user }, error } = await supabase.auth.updateUser({
-                data: { display_name: displayName }
-            })
+            await updateDisplayName({ displayName })
 
-            if (error) throw error
-
-            if (user) {
-                // Update local store
-                setProfile(extractProfileFromUser(user))
-                // You might want to use a toast here
-                console.log('Profile updated successfully')
+            // Update local store
+            if (profile) {
+                setProfile({
+                    ...profile,
+                    displayName,
+                })
             }
+
+            toast.success('Profile updated successfully')
         } catch (error: unknown) {
             console.error('Error updating profile:', error)
+            toast.error(error instanceof Error ? error.message : 'Failed to update profile')
         } finally {
             setIsLoading(false)
         }

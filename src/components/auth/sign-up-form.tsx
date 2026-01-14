@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
+import { useAuthActions } from "@convex-dev/auth/react"
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -24,10 +24,10 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { signIn } = useAuthActions()
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
@@ -37,21 +37,24 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
       return
     }
 
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      setIsLoading(false)
+      return
+    }
+
     try {
-      const { error } = await supabase.auth.signUp({
+      await signIn("password", {
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
-          data: {
-            display_name: displayName,
-          },
-        },
+        flow: "signUp",
+        // Additional profile data
+        name: displayName,
       })
-      if (error) throw error
       router.push('/auth/sign-up-success')
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'An error occurred')
+      console.error('Sign up error:', error)
+      setError(error instanceof Error ? error.message : 'An error occurred during sign up')
     } finally {
       setIsLoading(false)
     }
@@ -97,6 +100,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
                   id="password"
                   type="password"
                   required
+                  minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
