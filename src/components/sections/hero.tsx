@@ -10,7 +10,9 @@ import { HeroLogoMarquee } from "./logo-cloud"
 export function Hero() {
     return (
         <section className="relative flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center overflow-hidden py-16 md:py-32">
-            <HeroBackground />
+            <div className="hidden xl:flex">
+                <HeroBackground />
+            </div>
 
             <div className="container relative z-10 mx-auto flex flex-col items-center text-center px-4 md:px-6">
                 {/* <motion.div
