@@ -206,7 +206,7 @@ export function HeroBackground() {
     const track3 = createSymmetricPath(720, 140)
 
     return (
-        <div className="absolute inset-0 -z-10 overflow-hidden bg-background">
+        <div className="absolute inset-0 -z-10 hidden xl:block overflow-hidden bg-background">
             {/* --- PRIMARY BLUE SPHERES --- */}
             <Sphere color="var(--primary)" size="62.5rem" initialX="-15%" initialY="10%" duration={25} />
             <Sphere color="var(--primary)" size="50rem" initialX="65%" initialY="-5%" duration={30} />

@@ -227,39 +227,46 @@ export default function PersonalProjectsPage() {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {/* Existing Projects */}
                         {projects && projects.map((project) => (
-                            <Card key={project._id} className="hover:border-primary/50 transition-colors cursor-pointer group">
-                                <CardHeader className="flex flex-row items-start justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                            <Folder className="h-5 w-5 text-primary" />
+                            <Link key={project._id} href={`/p/${username}/${project._id}`}>
+                                <Card className="hover:border-primary/50 transition-colors cursor-pointer group h-full">
+                                    <CardHeader className="flex flex-row items-start justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                                <Folder className="h-5 w-5 text-primary" />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-base">{project.name}</CardTitle>
+                                                <CardDescription>{formatDate(project._creationTime)}</CardDescription>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <CardTitle className="text-base">{project.name}</CardTitle>
-                                            <CardDescription>{formatDate(project._creationTime)}</CardDescription>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleDeleteProject(project._id)
-                                        }}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </CardHeader>
-                                <CardContent>
-                                    {project.description ? (
-                                        <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
-                                    ) : (
-                                        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-500/10 text-green-500">
-                                            Active
-                                        </span>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                handleDeleteProject(project._id)
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {project.description ? (
+                                            <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
+                                        ) : project.isSetupComplete ? (
+                                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-500/10 text-green-500">
+                                                Active
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-500">
+                                                Setup Required
+                                            </span>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </Link>
                         ))}
 
                         {/* Create New Project Card - always visible but conditionally functional */}

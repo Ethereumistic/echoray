@@ -140,6 +140,13 @@ export const updateProject = mutation({
         id: v.id("projects"),
         name: v.optional(v.string()),
         description: v.optional(v.string()),
+        defaultView: v.optional(v.union(
+            v.literal("table"),
+            v.literal("kanban"),
+            v.literal("cards"),
+            v.literal("gallery")
+        )),
+        isSetupComplete: v.optional(v.boolean()),
         settings: v.optional(v.object({
             isPublic: v.optional(v.boolean()),
             allowedFeatures: v.optional(v.array(v.string())),
@@ -201,6 +208,31 @@ export const deleteProject = mutation({
             }
         }
 
+        // Delete all associated data
+        const fields = await ctx.db
+            .query("projectFields")
+            .withIndex("by_project", (q) => q.eq("projectId", id))
+            .collect();
+        for (const field of fields) {
+            await ctx.db.delete(field._id);
+        }
+
+        const records = await ctx.db
+            .query("projectRecords")
+            .withIndex("by_project", (q) => q.eq("projectId", id))
+            .collect();
+        for (const record of records) {
+            await ctx.db.delete(record._id);
+        }
+
+        const views = await ctx.db
+            .query("projectViews")
+            .withIndex("by_project", (q) => q.eq("projectId", id))
+            .collect();
+        for (const view of views) {
+            await ctx.db.delete(view._id);
+        }
+
         await ctx.db.delete(id);
         return { success: true };
     },
@@ -239,3 +271,407 @@ export const canCreateProject = query({
         return { canCreate: true, reason: null };
     },
 });
+
+// ============================================================================
+// PROJECT FIELDS (Schema-on-Read)
+// ============================================================================
+
+/**
+ * Get project schema (field definitions)
+ */
+export const getProjectSchema = query({
+    args: { projectId: v.id("projects") },
+    handler: async (ctx, { projectId }) => {
+        const fields = await ctx.db
+            .query("projectFields")
+            .withIndex("by_project", (q) => q.eq("projectId", projectId))
+            .collect();
+
+        return fields.sort((a, b) => a.order - b.order);
+    },
+});
+
+/**
+ * Create a new field definition
+ */
+export const createField = mutation({
+    args: {
+        projectId: v.id("projects"),
+        fieldKey: v.string(),
+        fieldName: v.string(),
+        fieldType: v.string(), // Accept any string, we'll validate in schema
+        subTypes: v.optional(v.array(v.string())),
+        simpleOptions: v.optional(v.array(v.string())),
+        isRequired: v.optional(v.boolean()),
+        currencySymbol: v.optional(v.string()),
+        placeholder: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        // Get next order number
+        const existingFields = await ctx.db
+            .query("projectFields")
+            .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+            .collect();
+
+        const nextOrder = existingFields.length;
+
+        return await ctx.db.insert("projectFields", {
+            projectId: args.projectId,
+            fieldKey: args.fieldKey,
+            fieldName: args.fieldName,
+            fieldType: args.fieldType as any,
+            subTypes: args.subTypes,
+            simpleOptions: args.simpleOptions,
+            isRequired: args.isRequired ?? false,
+            order: nextOrder,
+            currencySymbol: args.currencySymbol,
+            placeholder: args.placeholder,
+        });
+    },
+});
+
+/**
+ * Update a field definition
+ */
+export const updateField = mutation({
+    args: {
+        id: v.id("projectFields"),
+        fieldName: v.optional(v.string()),
+        simpleOptions: v.optional(v.array(v.string())),
+        subTypes: v.optional(v.array(v.string())),
+        isRequired: v.optional(v.boolean()),
+        order: v.optional(v.number()),
+        currencySymbol: v.optional(v.string()),
+        placeholder: v.optional(v.string()),
+    },
+    handler: async (ctx, { id, ...updates }) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        await ctx.db.patch(id, updates);
+        return { success: true };
+    },
+});
+
+/**
+ * Delete a field definition
+ */
+export const deleteField = mutation({
+    args: { id: v.id("projectFields") },
+    handler: async (ctx, { id }) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        await ctx.db.delete(id);
+        return { success: true };
+    },
+});
+
+/**
+ * Bulk create/update fields (for setup flow)
+ */
+export const saveFieldSchema = mutation({
+    args: {
+        projectId: v.id("projects"),
+        fields: v.array(v.object({
+            fieldKey: v.string(),
+            fieldName: v.string(),
+            fieldType: v.string(),
+            subTypes: v.optional(v.array(v.string())),
+            simpleOptions: v.optional(v.array(v.string())),
+            isRequired: v.optional(v.boolean()),
+            currencySymbol: v.optional(v.string()),
+            placeholder: v.optional(v.string()),
+        })),
+    },
+    handler: async (ctx, { projectId, fields }) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        // Delete existing fields
+        const existingFields = await ctx.db
+            .query("projectFields")
+            .withIndex("by_project", (q) => q.eq("projectId", projectId))
+            .collect();
+
+        for (const field of existingFields) {
+            await ctx.db.delete(field._id);
+        }
+
+        // Create new fields
+        for (let i = 0; i < fields.length; i++) {
+            const field = fields[i];
+            await ctx.db.insert("projectFields", {
+                projectId,
+                fieldKey: field.fieldKey,
+                fieldName: field.fieldName,
+                fieldType: field.fieldType as any,
+                subTypes: field.subTypes,
+                simpleOptions: field.simpleOptions,
+                isRequired: field.isRequired ?? false,
+                order: i,
+                currencySymbol: field.currencySymbol,
+                placeholder: field.placeholder,
+            });
+        }
+
+        return { success: true, count: fields.length };
+    },
+});
+
+// ============================================================================
+// PROJECT RECORDS (Card/Row Data)
+// ============================================================================
+
+/**
+ * Get all records for a project with schema applied
+ */
+export const getProjectRecords = query({
+    args: { projectId: v.id("projects") },
+    handler: async (ctx, { projectId }) => {
+        // Fetch schema
+        const fields = await ctx.db
+            .query("projectFields")
+            .withIndex("by_project", (q) => q.eq("projectId", projectId))
+            .collect();
+
+        // Fetch raw records
+        const records = await ctx.db
+            .query("projectRecords")
+            .withIndex("by_project", (q) => q.eq("projectId", projectId))
+            .collect();
+
+        // Return records with field metadata
+        return {
+            schema: fields.sort((a, b) => a.order - b.order),
+            records: records,
+        };
+    },
+});
+
+/**
+ * Create a new record
+ */
+export const createRecord = mutation({
+    args: {
+        projectId: v.id("projects"),
+        data: v.any(),
+    },
+    handler: async (ctx, { projectId, data }) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        // Optional: validate against schema
+        const fields = await ctx.db
+            .query("projectFields")
+            .withIndex("by_project", (q) => q.eq("projectId", projectId))
+            .collect();
+
+        // Check required fields
+        for (const field of fields) {
+            if (field.isRequired && !data[field.fieldKey]) {
+                throw new Error(`Field "${field.fieldName}" is required`);
+            }
+        }
+
+        return await ctx.db.insert("projectRecords", {
+            projectId,
+            data,
+            createdBy: userId,
+        });
+    },
+});
+
+/**
+ * Update a record
+ */
+export const updateRecord = mutation({
+    args: {
+        id: v.id("projectRecords"),
+        data: v.any(),
+    },
+    handler: async (ctx, { id, data }) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        await ctx.db.patch(id, { data });
+        return { success: true };
+    },
+});
+
+/**
+ * Delete a record
+ */
+export const deleteRecord = mutation({
+    args: { id: v.id("projectRecords") },
+    handler: async (ctx, { id }) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        await ctx.db.delete(id);
+        return { success: true };
+    },
+});
+
+// ============================================================================
+// PROJECT VIEWS (Table, Kanban, Cards, Gallery)
+// ============================================================================
+
+/**
+ * Get all views for a project
+ */
+export const getProjectViews = query({
+    args: { projectId: v.id("projects") },
+    handler: async (ctx, { projectId }) => {
+        return await ctx.db
+            .query("projectViews")
+            .withIndex("by_project", (q) => q.eq("projectId", projectId))
+            .collect();
+    },
+});
+
+/**
+ * Create a new view
+ */
+export const createView = mutation({
+    args: {
+        projectId: v.id("projects"),
+        name: v.string(),
+        viewType: v.union(
+            v.literal("table"),
+            v.literal("kanban"),
+            v.literal("cards"),
+            v.literal("gallery")
+        ),
+        isDefault: v.optional(v.boolean()),
+        config: v.optional(v.any()),
+    },
+    handler: async (ctx, args) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        // If this is the default view, unset other defaults
+        if (args.isDefault) {
+            const existingViews = await ctx.db
+                .query("projectViews")
+                .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+                .collect();
+
+            for (const view of existingViews) {
+                if (view.isDefault) {
+                    await ctx.db.patch(view._id, { isDefault: false });
+                }
+            }
+        }
+
+        return await ctx.db.insert("projectViews", {
+            projectId: args.projectId,
+            name: args.name,
+            viewType: args.viewType,
+            isDefault: args.isDefault ?? false,
+            config: args.config,
+        });
+    },
+});
+
+/**
+ * Update a view
+ */
+export const updateView = mutation({
+    args: {
+        id: v.id("projectViews"),
+        name: v.optional(v.string()),
+        viewType: v.optional(v.union(
+            v.literal("table"),
+            v.literal("kanban"),
+            v.literal("cards"),
+            v.literal("gallery")
+        )),
+        isDefault: v.optional(v.boolean()),
+        config: v.optional(v.any()),
+    },
+    handler: async (ctx, { id, ...updates }) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        const view = await ctx.db.get(id);
+        if (!view) throw new Error("View not found");
+
+        // If setting as default, unset other defaults
+        if (updates.isDefault) {
+            const existingViews = await ctx.db
+                .query("projectViews")
+                .withIndex("by_project", (q) => q.eq("projectId", view.projectId))
+                .collect();
+
+            for (const v of existingViews) {
+                if (v._id !== id && v.isDefault) {
+                    await ctx.db.patch(v._id, { isDefault: false });
+                }
+            }
+        }
+
+        await ctx.db.patch(id, updates);
+        return { success: true };
+    },
+});
+
+/**
+ * Delete a view
+ */
+export const deleteView = mutation({
+    args: { id: v.id("projectViews") },
+    handler: async (ctx, { id }) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        await ctx.db.delete(id);
+        return { success: true };
+    },
+});
+
+/**
+ * Complete project setup (set default view and mark as setup complete)
+ */
+export const completeProjectSetup = mutation({
+    args: {
+        projectId: v.id("projects"),
+        defaultView: v.union(
+            v.literal("table"),
+            v.literal("kanban"),
+            v.literal("cards"),
+            v.literal("gallery")
+        ),
+    },
+    handler: async (ctx, { projectId, defaultView }) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) throw new Error("Not authenticated");
+
+        // Update project
+        await ctx.db.patch(projectId, {
+            defaultView,
+            isSetupComplete: true,
+        });
+
+        // Create default view if it doesn't exist
+        const existingViews = await ctx.db
+            .query("projectViews")
+            .withIndex("by_project", (q) => q.eq("projectId", projectId))
+            .collect();
+
+        if (existingViews.length === 0) {
+            await ctx.db.insert("projectViews", {
+                projectId,
+                name: "Default View",
+                viewType: defaultView,
+                isDefault: true,
+            });
+        }
+
+        return { success: true };
+    },
+});
+
