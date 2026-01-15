@@ -38,20 +38,25 @@ export const listMyProjects = query({
 
 /**
  * Get a single project by ID
+ * Returns { project, error } to allow graceful error handling in UI
  */
 export const getProject = query({
     args: { id: v.id("projects") },
     handler: async (ctx, { id }) => {
         const userId = await auth.getUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
+        if (!userId) {
+            return { project: null, error: "not_authenticated" as const };
+        }
 
         const project = await ctx.db.get(id);
-        if (!project) return null;
+        if (!project) {
+            return { project: null, error: "not_found" as const };
+        }
 
         // Check access: either owner or org member
         if (project.ownerId) {
             if (project.ownerId !== userId) {
-                throw new Error("Not authorized to view this project");
+                return { project: null, error: "not_authorized" as const };
             }
         } else if (project.organizationId) {
             const membership = await ctx.db
@@ -62,11 +67,11 @@ export const getProject = query({
                 .first();
 
             if (!membership || membership.status !== "active") {
-                throw new Error("Not a member of this organization");
+                return { project: null, error: "not_member" as const };
             }
         }
 
-        return project;
+        return { project, error: null };
     },
 });
 

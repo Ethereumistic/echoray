@@ -9,27 +9,27 @@ import Link from 'next/link'
 
 /**
  * Personal workspace landing page
- * Route: /p/[username]
+ * Route: /p/[userId] (immutable ID-based routing)
  */
 export default function PersonalWorkspacePage() {
     const params = useParams()
-    const username = params.slug as string
+    const userId = params.slug as string  // slug param now contains user ID
     const { profile } = useAuthStore()
 
-    const displayName = profile?.displayName || username
+    const displayName = profile?.displayName || 'Personal'
 
     const quickLinks = [
         {
             title: 'Projects',
             description: 'View and manage your personal projects',
             icon: FolderOpen,
-            href: `/p/${username}/projects`,
+            href: `/p/${userId}/projects`,
         },
         {
             title: 'Documents',
             description: 'Access your personal documents',
             icon: FileText,
-            href: `/p/${username}/documents`,
+            href: `/p/${userId}/documents`,
         },
         {
             title: 'Settings',

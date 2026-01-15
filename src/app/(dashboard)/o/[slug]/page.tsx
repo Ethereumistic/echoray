@@ -33,9 +33,9 @@ export default function OrganizationDashboardPage() {
     useEffect(() => {
         if (!slug || isAuthLoading) return
 
-        // Check if the current active org matches the slug
-        if (activeOrganization?.slug !== slug) {
-            const targetOrg = organizations.find(o => o.slug === slug)
+        // Check if the current active org matches the ID in URL
+        if (activeOrganization?._id !== slug) {
+            const targetOrg = organizations.find(o => o._id === slug)
 
             if (targetOrg) {
                 setIsSwitching(true)

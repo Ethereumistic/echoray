@@ -36,12 +36,13 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
         password,
         flow: "signIn",
       })
-      // Redirect to dashboard or intended destination (sanitize to prevent loops)
-      const rawRedirect = searchParams.get('redirectTo')
-      const redirectTo = (rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('/auth'))
-        ? decodeURIComponent(rawRedirect)
+      // Redirect to intended destination or dashboard
+      // Note: searchParams.get() already returns decoded value
+      const redirectTo = searchParams.get('redirectTo')
+      const safeRedirect = (redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('/auth'))
+        ? redirectTo
         : '/dashboard'
-      router.push(redirectTo)
+      router.push(safeRedirect)
     } catch (error: unknown) {
       console.error('Login error:', error)
       setError(error instanceof Error ? error.message : 'Invalid email or password')

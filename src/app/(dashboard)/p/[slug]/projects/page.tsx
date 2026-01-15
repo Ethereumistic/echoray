@@ -32,12 +32,12 @@ import { useAuthStore } from '@/stores/auth-store'
 /**
  * Personal Projects page.
  * Lists all personal projects for the current user with real Convex data.
- * Route: /p/[username]/projects
+ * Route: /p/[userId]/projects (immutable ID-based routing)
  * Uses project.create permission check for gating.
  */
 export default function PersonalProjectsPage() {
     const params = useParams()
-    const username = params.slug as string
+    const urlUserId = params.slug as string  // slug param now contains user ID
     const { profile } = useAuthStore()
 
     const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -53,7 +53,31 @@ export default function PersonalProjectsPage() {
 
     const canCreate = canCreateResult?.canCreate ?? false
     const isLoading = projects === undefined
-    const displayName = profile?.displayName || username
+    const displayName = profile?.displayName || 'Personal'
+
+    // Check if user is viewing someone else's personal projects route
+    const isWrongUser = profile?.id && urlUserId !== profile.id
+
+    // Show warning if viewing wrong user's route
+    if (isWrongUser) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+                <div className="rounded-full bg-amber-500/10 p-4">
+                    <User className="h-8 w-8 text-amber-500" />
+                </div>
+                <h2 className="text-2xl font-bold">Wrong Personal Workspace</h2>
+                <p className="text-muted-foreground text-center max-w-md">
+                    This URL belongs to a different user&apos;s personal workspace.
+                    You can only view your own personal projects.
+                </p>
+                <Link href={`/p/${profile.id}/projects`}>
+                    <Button>
+                        Go to My Projects
+                    </Button>
+                </Link>
+            </div>
+        )
+    }
 
     const handleCreateProject = async () => {
         if (!projectName.trim()) return
@@ -228,7 +252,7 @@ export default function PersonalProjectsPage() {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {/* Existing Projects */}
                         {projects && projects.map((project) => (
-                            <Link key={project._id} href={`/p/${username}/${project._id}`}>
+                            <Link key={project._id} href={`/p/${urlUserId}/${project._id}`}>
                                 <Card className="hover:border-primary/50 transition-colors cursor-pointer group h-full">
                                     <CardHeader className="flex flex-row items-start justify-between">
                                         <div className="flex items-center gap-3">

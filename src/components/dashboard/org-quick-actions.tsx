@@ -10,7 +10,7 @@ import {
     ArrowRight
 } from "lucide-react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useAuthStore } from "@/stores/auth-store"
 import { InviteMemberDialog } from "./invite-member-dialog"
 import { PermissionGuard } from "./permission-guard"
 import { PermissionCode } from "@/types/permissions"
@@ -30,7 +30,8 @@ interface Action {
  * Designed with a premium, glassmorphic look.
  */
 export function OrgQuickActions({ onMemberInvited }: { onMemberInvited?: () => void }) {
-    const { slug } = useParams()
+    const { activeOrganization } = useAuthStore()
+    const orgId = activeOrganization?._id
 
     const actions: Action[] = [
         {
@@ -46,7 +47,7 @@ export function OrgQuickActions({ onMemberInvited }: { onMemberInvited?: () => v
             description: "Create and customize permissions for your team.",
             icon: <Shield className="h-5 w-5 text-emerald-400" />,
             permission: "roles.manage",
-            href: `/o/${slug}/settings?tab=roles`,
+            href: `/o/${orgId}/settings?tab=roles`,
             color: "from-emerald-500/10 to-teal-500/10 hover:border-emerald-500/30"
         },
         {
@@ -54,7 +55,7 @@ export function OrgQuickActions({ onMemberInvited }: { onMemberInvited?: () => v
             description: "Update organization name, slug, and description.",
             icon: <Settings className="h-5 w-5 text-amber-400" />,
             permission: "org.settings",
-            href: `/o/${slug}/settings`,
+            href: `/o/${orgId}/settings`,
             color: "from-amber-500/10 to-orange-500/10 hover:border-amber-500/30"
         },
     ]

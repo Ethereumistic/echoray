@@ -32,9 +32,9 @@ export default function OrgSettingsPage() {
     useEffect(() => {
         if (!slug || isAuthLoading) return
 
-        // Ensure we are working with the correct organization context
-        if (activeOrganization?.slug !== slug) {
-            const targetOrg = organizations.find(o => o.slug === slug)
+        // Ensure we are working with the correct organization context (slug is now org ID)
+        if (activeOrganization?._id !== slug) {
+            const targetOrg = organizations.find(o => o._id === slug)
             if (targetOrg) {
                 setIsSwitching(true)
                 setActiveOrganization(targetOrg)

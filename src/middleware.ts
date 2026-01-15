@@ -1,4 +1,5 @@
-import { convexAuthNextjsMiddleware, createRouteMatcher, nextjsMiddlewareRedirect } from "@convex-dev/auth/nextjs/server";
+import { convexAuthNextjsMiddleware, createRouteMatcher } from "@convex-dev/auth/nextjs/server";
+import { NextResponse } from "next/server";
 
 /**
  * Define which routes are public (marketing) and don't require authentication.
@@ -30,7 +31,7 @@ const isAuthRoute = createRouteMatcher([
 ]);
 
 export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
-  const pathname = request.nextUrl.pathname;
+  const { pathname, search, origin } = request.nextUrl;
 
   // Allow public routes and auth routes without authentication
   if (isPublicRoute(request) || isAuthRoute(request)) {
@@ -41,9 +42,12 @@ export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
   const isAuthenticated = await convexAuth.isAuthenticated();
 
   if (!isAuthenticated) {
-    // Redirect to login - only set redirectTo for non-auth routes to prevent encoding loops
-    const redirectUrl = pathname.startsWith('/auth') ? '/auth/login' : `/auth/login?redirectTo=${encodeURIComponent(pathname)}`;
-    return nextjsMiddlewareRedirect(request, redirectUrl);
+    // Build redirect URL using URL constructor to avoid encoding issues
+    const loginUrl = new URL("/auth/login", origin);
+    // Capture full path for redirect after login
+    const fullPath = pathname + search;
+    loginUrl.searchParams.set("redirectTo", fullPath);
+    return NextResponse.redirect(loginUrl);
   }
 });
 
@@ -59,3 +63,4 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
+

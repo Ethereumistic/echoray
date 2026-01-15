@@ -72,6 +72,8 @@ import {
     Palette,
     FileText,
     Link2,
+    Lock,
+    FolderOpen,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuthStore } from '@/stores/auth-store'
@@ -142,11 +144,14 @@ export default function OrgProjectDetailPage() {
     const projectParam = params.project as string
     const { activeOrganization } = useAuthStore()
 
-    // Fetch project data
-    const project = useQuery(
+    // Fetch project data - now returns { project, error }
+    const projectResult = useQuery(
         api.projects.getProject,
         { id: projectParam as Id<"projects"> }
     )
+    const project = projectResult?.project
+    const projectError = projectResult?.error
+
     const projectData = useQuery(
         api.projects.getProjectRecords,
         project ? { projectId: project._id } : "skip"
@@ -173,7 +178,49 @@ export default function OrgProjectDetailPage() {
     // Settings dialog state
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
-    // Loading state
+    // Error states - show UI message instead of crashing
+    if (projectError === "not_authorized" || projectError === "not_member") {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+                <div className="rounded-full bg-destructive/10 p-4">
+                    <Lock className="h-8 w-8 text-destructive" />
+                </div>
+                <h2 className="text-2xl font-bold">Access Denied</h2>
+                <p className="text-muted-foreground text-center max-w-md">
+                    You don&apos;t have permission to view this project.
+                    This may be a private project or you may not be a member of the organization that owns it.
+                </p>
+                <Link href="/dashboard">
+                    <Button variant="outline">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to Dashboard
+                    </Button>
+                </Link>
+            </div>
+        )
+    }
+
+    if (projectError === "not_found") {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+                <div className="rounded-full bg-muted p-4">
+                    <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h2 className="text-2xl font-bold">Project Not Found</h2>
+                <p className="text-muted-foreground text-center max-w-md">
+                    This project doesn&apos;t exist or may have been deleted.
+                </p>
+                <Link href="/dashboard">
+                    <Button variant="outline">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to Dashboard
+                    </Button>
+                </Link>
+            </div>
+        )
+    }
+
+    // Loading state (still fetching or no error yet but no project)
     if (!project) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">

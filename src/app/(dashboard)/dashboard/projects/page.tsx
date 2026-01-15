@@ -7,18 +7,15 @@ import { Loader2 } from 'lucide-react'
 
 /**
  * Dashboard projects page - redirects to personal projects
- * Route: /dashboard/projects -> /p/[username]/projects
+ * Route: /dashboard/projects -> /p/[userId]/projects (immutable ID-based routing)
  */
 export default function ProjectsRedirectPage() {
     const router = useRouter()
     const { profile } = useAuthStore()
 
     useEffect(() => {
-        if (profile) {
-            const userSlug = profile.displayName?.toLowerCase().replace(/\s+/g, '-') ||
-                profile.email?.split('@')[0] ||
-                'me'
-            router.replace(`/p/${userSlug}/projects`)
+        if (profile?.id) {
+            router.replace(`/p/${profile.id}/projects`)
         }
     }, [profile, router])
 

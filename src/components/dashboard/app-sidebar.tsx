@@ -74,8 +74,8 @@ interface NavItem {
 }
 
 const getNavItems = (
-    orgSlug?: string,
-    userSlug?: string,
+    orgId?: string,
+    userId?: string,
     canCreateProjects?: boolean,
     organizations?: Organization[]
 ): NavItem[] => {
@@ -84,17 +84,17 @@ const getNavItems = (
     ]
 
     // Organization workspace link (only if org is selected)
-    if (orgSlug) {
+    if (orgId) {
         items.push({
             title: "Workspace",
-            href: `/o/${orgSlug}`,
+            href: `/o/${orgId}`,
             icon: Building2,
             organizationOnly: true
         })
     }
 
     // Personal projects href
-    const personalProjectsHref = userSlug ? `/p/${userSlug}/projects` : "/dashboard/projects"
+    const personalProjectsHref = userId ? `/p/${userId}/projects` : "/dashboard/projects"
 
     // Projects item - different based on permission
     if (canCreateProjects && organizations && organizations.length > 0) {
@@ -107,13 +107,13 @@ const getNavItems = (
         for (const org of organizations) {
             projectSubItems.push({
                 title: org.name,
-                href: `/o/${org.slug}/projects`,
+                href: `/o/${org._id}/projects`,
             })
         }
 
         items.push({
             title: "Projects",
-            href: orgSlug ? `/o/${orgSlug}/projects` : personalProjectsHref,
+            href: orgId ? `/o/${orgId}/projects` : personalProjectsHref,
             icon: FolderOpen,
             items: projectSubItems
         })
@@ -130,20 +130,20 @@ const getNavItems = (
     items.push(
         {
             title: "Documents",
-            href: orgSlug ? `/o/${orgSlug}/documents` : "/dashboard/documents",
+            href: orgId ? `/o/${orgId}/documents` : "/dashboard/documents",
             icon: FileText
         },
         {
             title: "Team",
-            href: orgSlug ? `/o/${orgSlug}/settings?tab=members` : "/dashboard/team",
+            href: orgId ? `/o/${orgId}/settings?tab=members` : "/dashboard/team",
             icon: Users,
         }
     )
 
-    if (orgSlug) {
+    if (orgId) {
         items.push({
             title: "Workspace Settings",
-            href: `/o/${orgSlug}/settings`,
+            href: `/o/${orgId}/settings`,
             icon: Settings
         })
     } else {
@@ -183,12 +183,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         router.push('/')
     }
 
-    // Get user slug for personal workspace routes
-    const userSlug = profile?.displayName?.toLowerCase().replace(/\s+/g, '-') ||
-        profile?.email?.split('@')[0] ||
-        'me'
+    // Get user ID for personal workspace routes (immutable)
+    const userId = profile?.id || 'me'
 
-    const navItems = getNavItems(activeOrganization?.slug, userSlug, canCreateProjects, organizations)
+    const navItems = getNavItems(activeOrganization?._id, userId, canCreateProjects, organizations)
 
     // Permission-based filtering
     const { hasPermission } = useAuthStore()
@@ -347,7 +345,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
                                 {activeOrganization && (
                                     <DropdownMenuItem
-                                        onClick={() => router.push(`/o/${activeOrganization.slug}/settings`)}
+                                        onClick={() => router.push(`/o/${activeOrganization._id}/settings`)}
                                         className="gap-2 p-2 rounded-lg text-primary bg-primary/5 border border-primary/10"
                                     >
                                         <div className="flex size-6 items-center justify-center rounded-md border border-primary/20 bg-primary/10">
@@ -365,7 +363,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         key={org._id}
                                         onClick={() => {
                                             setActiveOrganization(org)
-                                            router.push(`/o/${org.slug}`)
+                                            router.push(`/o/${org._id}`)
                                         }}
                                         className="gap-2 p-2 rounded-lg"
                                     >
