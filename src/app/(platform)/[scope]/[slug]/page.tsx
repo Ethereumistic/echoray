@@ -6,16 +6,115 @@ import { useAuthStore } from "@/stores/auth-store"
 import { useQuery } from "convex/react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Activity, Users, FolderOpen, Loader2 } from "lucide-react"
+import { Activity, Users, FolderOpen, Loader2, User, FileText, Settings } from "lucide-react"
 import { OrgQuickActions } from "@/components/dashboard/org-quick-actions"
+import Link from "next/link"
 import { api } from "../../../../../convex/_generated/api"
+import { useScopeContext } from "./layout"
 
 /**
- * Organization-specific dashboard page.
- * Displays overview stats and activity for the selected organization.
+ * Unified workspace page for both personal (p) and organization (o) scopes.
+ * Route: /p/[userId] or /o/[orgId]
  */
-export default function OrganizationDashboardPage() {
-    const { slug } = useParams()
+export default function WorkspacePage() {
+    const { scope, slug, isPersonal, isOrganization } = useScopeContext()
+
+    if (isPersonal) {
+        return <PersonalWorkspaceContent slug={slug} />
+    }
+
+    return <OrganizationWorkspaceContent slug={slug} />
+}
+
+// ============================================================================
+// Personal Workspace Content
+// ============================================================================
+
+function PersonalWorkspaceContent({ slug }: { slug: string }) {
+    const { profile } = useAuthStore()
+    const displayName = profile?.displayName || 'Personal'
+
+    const quickLinks = [
+        {
+            title: 'Projects',
+            description: 'View and manage your personal projects',
+            icon: FolderOpen,
+            href: `/p/${slug}/projects`,
+        },
+        {
+            title: 'Documents',
+            description: 'Access your personal documents',
+            icon: FileText,
+            href: `/p/${slug}/documents`,
+        },
+        {
+            title: 'Settings',
+            description: 'Manage your personal settings',
+            icon: Settings,
+            href: '/dashboard/settings',
+        },
+    ]
+
+    return (
+        <div className="flex flex-col">
+            <DashboardHeader
+                title="Personal Workspace"
+                description={`Welcome back, ${displayName}`}
+            />
+
+            <main className="flex-1 p-6 space-y-6">
+                {/* User Info Card */}
+                <Card className="bg-linear-to-r from-primary/10 to-primary/5 border-primary/20">
+                    <CardHeader>
+                        <div className="flex items-center gap-4">
+                            <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
+                                <User className="h-8 w-8 text-primary" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl">{displayName}</CardTitle>
+                                <CardDescription className="text-base">
+                                    {profile?.email || 'Personal Workspace'}
+                                </CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">
+                            Your personal workspace for private projects and documents.
+                        </p>
+                    </CardContent>
+                </Card>
+
+                {/* Quick Links */}
+                <div className="grid gap-4 md:grid-cols-3">
+                    {quickLinks.map((link) => (
+                        <Link key={link.href} href={link.href}>
+                            <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                                <CardHeader>
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                            <link.icon className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <div>
+                                            <CardTitle className="text-base">{link.title}</CardTitle>
+                                            <CardDescription>{link.description}</CardDescription>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                            </Card>
+                        </Link>
+                    ))}
+                </div>
+            </main>
+        </div>
+    )
+}
+
+// ============================================================================
+// Organization Workspace Content
+// ============================================================================
+
+function OrganizationWorkspaceContent({ slug }: { slug: string }) {
     const {
         organizations,
         activeOrganization,

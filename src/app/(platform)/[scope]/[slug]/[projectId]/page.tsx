@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo } from 'react'
-import { useParams } from 'next/navigation'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../../../../convex/_generated/api'
 import { Id } from '../../../../../../convex/_generated/dataModel'
@@ -76,9 +75,26 @@ import {
     FolderOpen,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useAuthStore } from '@/stores/auth-store'
 import { FieldSchemaEditor, FieldDefinition } from '@/components/projects/field-editor'
 import { ProjectSettings } from '@/components/projects/project-settings'
+import { useScopeContext } from '../layout'
+
+// Field schema interface for type safety (matches Convex projectFields type)
+interface FieldSchema {
+    fieldKey: string
+    fieldName: string
+    fieldType: string
+    isRequired?: boolean
+    placeholder?: string
+    currencySymbol?: string
+    options?: { color?: string; value: string; label: string }[]
+}
+
+// Record interface
+interface ProjectRecord {
+    _id: Id<"projectRecords">
+    data?: Record<string, string | number | boolean>
+}
 
 // Extended field type icons
 const FIELD_TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -121,33 +137,22 @@ const VIEW_TYPES = [
     { value: "gallery", label: "Gallery", icon: ImageIcon, description: "Image-focused grid" },
 ]
 
-// Field schema interface for type safety (matches Convex projectFields type)
-interface FieldSchema {
-    fieldKey: string
-    fieldName: string
-    fieldType: string
-    isRequired?: boolean
-    placeholder?: string
-    currencySymbol?: string
-    options?: { color?: string; value: string; label: string }[]
-}
-
-// Record interface
-interface ProjectRecord {
-    _id: Id<"projectRecords">
-    data?: Record<string, string | number | boolean>
-}
-
-export default function OrgProjectDetailPage() {
-    const params = useParams()
-    const orgSlug = params.slug as string
-    const projectParam = params.project as string
-    const { activeOrganization } = useAuthStore()
+/**
+ * Unified Project Detail page for both personal (p) and organization (o) scopes.
+ * Route: /p/[userId]/[projectId] or /o/[orgId]/[projectId]
+ */
+export default function ProjectDetailPage({
+    params
+}: {
+    params: { scope: string; slug: string; projectId: string }
+}) {
+    const { scope, slug } = useScopeContext()
+    const projectId = params.projectId
 
     // Fetch project data - now returns { project, error }
     const projectResult = useQuery(
         api.projects.getProject,
-        { id: projectParam as Id<"projects"> }
+        { id: projectId as Id<"projects"> }
     )
     const project = projectResult?.project
     const projectError = projectResult?.error
@@ -190,10 +195,10 @@ export default function OrgProjectDetailPage() {
                     You don&apos;t have permission to view this project.
                     This may be a private project or you may not be a member of the organization that owns it.
                 </p>
-                <Link href="/dashboard">
+                <Link href={`/${scope}/${slug}/projects`}>
                     <Button variant="outline">
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Dashboard
+                        Back to Projects
                     </Button>
                 </Link>
             </div>
@@ -210,10 +215,10 @@ export default function OrgProjectDetailPage() {
                 <p className="text-muted-foreground text-center max-w-md">
                     This project doesn&apos;t exist or may have been deleted.
                 </p>
-                <Link href="/dashboard">
+                <Link href={`/${scope}/${slug}/projects`}>
                     <Button variant="outline">
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Dashboard
+                        Back to Projects
                     </Button>
                 </Link>
             </div>
@@ -233,10 +238,11 @@ export default function OrgProjectDetailPage() {
     const isSetupComplete = project.isSetupComplete
 
     // =========================================================================
-    // SETUP FLOW HANDLERS
+    // SETUP FLOW (for new projects)
     // =========================================================================
 
     const handleCompleteSetup = async () => {
+        // Validate fields
         const validFields = fields.filter(f => f.fieldName.trim())
         if (validFields.length === 0) {
             alert("Please add at least one field")
@@ -245,6 +251,7 @@ export default function OrgProjectDetailPage() {
 
         setIsSaving(true)
         try {
+            // Save field schema
             await saveFieldSchema({
                 projectId: project._id,
                 fields: validFields.map((f, i) => ({
@@ -259,6 +266,7 @@ export default function OrgProjectDetailPage() {
                 })),
             })
 
+            // Complete setup
             await completeSetup({
                 projectId: project._id,
                 defaultView: selectedViewType as "table" | "kanban" | "cards" | "gallery",
@@ -307,7 +315,7 @@ export default function OrgProjectDetailPage() {
             <div className="flex flex-col">
                 <DashboardHeader
                     title={project.name}
-                    description={`Set up project for ${activeOrganization?.name || orgSlug}`}
+                    description="Set up your project"
                 />
 
                 <main className="flex-1 p-6 space-y-6">
@@ -426,14 +434,14 @@ export default function OrgProjectDetailPage() {
         <div className="flex flex-col">
             <DashboardHeader
                 title={project.name}
-                description={project.description || `${records.length} records • ${activeOrganization?.name || orgSlug}`}
+                description={project.description || `${records.length} records`}
             />
 
             <main className="flex-1 p-6 space-y-6">
                 {/* Action Bar */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Link href={`/o/${orgSlug}/projects`}>
+                        <Link href={`/${scope}/${slug}/projects`}>
                             <Button variant="ghost" size="sm">
                                 <ArrowLeft className="mr-2 h-4 w-4" />
                                 Back to Projects
@@ -565,39 +573,117 @@ export default function OrgProjectDetailPage() {
 }
 
 // =========================================================================
-// HELPER COMPONENTS (same as personal projects page)
+// HELPER HOOK
 // =========================================================================
 
-function DynamicFieldInput({ field, value, onChange }: { field: FieldSchema; value: unknown; onChange: (value: string | number | boolean) => void }) {
+function useProjectId() {
+    // Get projectId from URL params - it's the last segment after [slug]
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
+    const segments = pathname.split('/').filter(Boolean)
+    // URL: /{scope}/{slug}/{projectId}
+    return segments[2] || ''
+}
+
+// =========================================================================
+// DYNAMIC FIELD INPUT COMPONENT
+// =========================================================================
+
+function DynamicFieldInput({
+    field,
+    value,
+    onChange
+}: {
+    field: FieldSchema
+    value: unknown
+    onChange: (value: string | number | boolean) => void
+}) {
     switch (field.fieldType) {
         case 'textarea':
-            return <Textarea value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} />
+            return (
+                <Textarea
+                    value={String(value ?? '')}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={field.placeholder}
+                />
+            )
         case 'date':
-            return <Input type="date" value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} />
+            return (
+                <Input
+                    type="date"
+                    value={String(value ?? '')}
+                    onChange={(e) => onChange(e.target.value)}
+                />
+            )
         case 'number':
         case 'currency':
-            return <Input type="number" step="0.01" value={typeof value === 'number' ? value : ''} onChange={(e) => onChange(parseFloat(e.target.value) || 0)} placeholder={field.placeholder} />
+            return (
+                <Input
+                    type="number"
+                    step="0.01"
+                    value={typeof value === 'number' ? value : ''}
+                    onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+                    placeholder={field.placeholder}
+                />
+            )
         case 'checkbox':
-            return <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4" />
+            return (
+                <input
+                    type="checkbox"
+                    checked={!!value}
+                    onChange={(e) => onChange(e.target.checked)}
+                    className="h-4 w-4"
+                />
+            )
         case 'select':
             return (
                 <Select value={String(value ?? '')} onValueChange={onChange}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
                     <SelectContent>
-                        {field.options?.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                        {field.options?.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
                     </SelectContent>
                 </Select>
             )
         case 'url':
         case 'email':
-            return <Input type={field.fieldType === 'email' ? 'email' : 'url'} value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder || (field.fieldType === 'url' ? 'https://...' : 'email@example.com')} />
+            return (
+                <Input
+                    type={field.fieldType === 'email' ? 'email' : 'url'}
+                    value={String(value ?? '')}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={field.placeholder || (field.fieldType === 'url' ? 'https://...' : 'email@example.com')}
+                />
+            )
         default:
-            return <Input type="text" value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} />
+            return (
+                <Input
+                    type="text"
+                    value={String(value ?? '')}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={field.placeholder}
+                />
+            )
     }
 }
 
-function TableView({ schema, records, onDelete }: { schema: FieldSchema[]; records: ProjectRecord[]; onDelete: (id: Id<"projectRecords">) => void }) {
+// =========================================================================
+// VIEW COMPONENTS
+// =========================================================================
+
+function TableView({
+    schema,
+    records,
+    onDelete
+}: {
+    schema: FieldSchema[]
+    records: ProjectRecord[]
+    onDelete: (id: Id<"projectRecords">) => void
+}) {
     if (records.length === 0) return null
+
     return (
         <div className="rounded-lg border">
             <Table>
@@ -605,7 +691,10 @@ function TableView({ schema, records, onDelete }: { schema: FieldSchema[]; recor
                     <TableRow>
                         {schema.map((field) => (
                             <TableHead key={field.fieldKey}>
-                                <div className="flex items-center gap-2">{FIELD_TYPE_ICONS[field.fieldType]} {field.fieldName}</div>
+                                <div className="flex items-center gap-2">
+                                    {FIELD_TYPE_ICONS[field.fieldType]}
+                                    {field.fieldName}
+                                </div>
                             </TableHead>
                         ))}
                         <TableHead className="w-[50px]"></TableHead>
@@ -615,10 +704,20 @@ function TableView({ schema, records, onDelete }: { schema: FieldSchema[]; recor
                     {records.map((record) => (
                         <TableRow key={record._id}>
                             {schema.map((field) => (
-                                <TableCell key={field.fieldKey}><CellDisplay field={field} value={record.data?.[field.fieldKey]} /></TableCell>
+                                <TableCell key={field.fieldKey}>
+                                    <CellDisplay
+                                        field={field}
+                                        value={record.data?.[field.fieldKey]}
+                                    />
+                                </TableCell>
                             ))}
                             <TableCell>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(record._id)}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => onDelete(record._id)}
+                                >
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </TableCell>
@@ -630,23 +729,45 @@ function TableView({ schema, records, onDelete }: { schema: FieldSchema[]; recor
     )
 }
 
-function CardsView({ schema, records, onDelete }: { schema: FieldSchema[]; records: ProjectRecord[]; onDelete: (id: Id<"projectRecords">) => void }) {
+function CardsView({
+    schema,
+    records,
+    onDelete
+}: {
+    schema: FieldSchema[]
+    records: ProjectRecord[]
+    onDelete: (id: Id<"projectRecords">) => void
+}) {
     if (records.length === 0) return null
+
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {records.map((record) => (
                 <Card key={record._id} className="group hover:border-primary/50 transition-colors">
                     <CardHeader className="flex flex-row items-start justify-between pb-2">
-                        <CardTitle className="text-base">{record.data?.[schema[0]?.fieldKey] || 'Untitled'}</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(record._id)}>
+                        <CardTitle className="text-base">
+                            {record.data?.[schema[0]?.fieldKey] || 'Untitled'}
+                        </CardTitle>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => onDelete(record._id)}
+                        >
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {schema.slice(1).map((field) => (
                             <div key={field.fieldKey} className="flex items-center gap-2 text-sm">
-                                <span className="text-muted-foreground flex items-center gap-1">{FIELD_TYPE_ICONS[field.fieldType]} {field.fieldName}:</span>
-                                <CellDisplay field={field} value={record.data?.[field.fieldKey]} />
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                    {FIELD_TYPE_ICONS[field.fieldType]}
+                                    {field.fieldName}:
+                                </span>
+                                <CellDisplay
+                                    field={field}
+                                    value={record.data?.[field.fieldKey]}
+                                />
                             </div>
                         ))}
                     </CardContent>
@@ -656,10 +777,23 @@ function CardsView({ schema, records, onDelete }: { schema: FieldSchema[]; recor
     )
 }
 
-function KanbanView({ schema, records, onDelete }: { schema: FieldSchema[]; records: ProjectRecord[]; onDelete: (id: Id<"projectRecords">) => void }) {
+function KanbanView({
+    schema,
+    records,
+    onDelete
+}: {
+    schema: FieldSchema[]
+    records: ProjectRecord[]
+    onDelete: (id: Id<"projectRecords">) => void
+}) {
+    // Group by first select field, or just show all in one column
     const groupByField = schema.find(f => f.fieldType === 'select')
+
     const grouped = useMemo(() => {
-        if (!groupByField) return { 'All Records': records }
+        if (!groupByField) {
+            return { 'All Records': records }
+        }
+
         return records.reduce((acc: Record<string, ProjectRecord[]>, record) => {
             const groupValue = String(record.data?.[groupByField.fieldKey] || 'Uncategorized')
             if (!acc[groupValue]) acc[groupValue] = []
@@ -675,22 +809,33 @@ function KanbanView({ schema, records, onDelete }: { schema: FieldSchema[]; reco
                     <div className="bg-muted/30 rounded-lg p-4">
                         <h3 className="font-semibold mb-4 flex items-center justify-between">
                             {groupName}
-                            <span className="text-xs bg-muted px-2 py-1 rounded">{groupRecords.length}</span>
+                            <span className="text-xs bg-muted px-2 py-1 rounded">
+                                {groupRecords.length}
+                            </span>
                         </h3>
                         <div className="space-y-2">
                             {groupRecords.map((record: ProjectRecord) => (
                                 <Card key={record._id} className="group cursor-move">
                                     <CardContent className="p-3">
                                         <div className="flex items-start justify-between">
-                                            <div className="font-medium text-sm">{record.data?.[schema[0]?.fieldKey] || 'Untitled'}</div>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive" onClick={() => onDelete(record._id)}>
+                                            <div className="font-medium text-sm">
+                                                {record.data?.[schema[0]?.fieldKey] || 'Untitled'}
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                                                onClick={() => onDelete(record._id)}
+                                            >
                                                 <Trash2 className="h-3 w-3" />
                                             </Button>
                                         </div>
                                         {schema.length > 1 && (
                                             <div className="mt-2 text-xs text-muted-foreground">
                                                 {schema.slice(1, 3).map((field) => (
-                                                    <div key={field.fieldKey} className="truncate">{field.fieldName}: {record.data?.[field.fieldKey] || '-'}</div>
+                                                    <div key={field.fieldKey} className="truncate">
+                                                        {field.fieldName}: {record.data?.[field.fieldKey] || '-'}
+                                                    </div>
                                                 ))}
                                             </div>
                                         )}
@@ -706,10 +851,23 @@ function KanbanView({ schema, records, onDelete }: { schema: FieldSchema[]; reco
 }
 
 function CellDisplay({ field, value }: { field: FieldSchema; value: unknown }) {
-    if (value === undefined || value === null || value === '') return <span className="text-muted-foreground">-</span>
+    if (value === undefined || value === null || value === '') {
+        return <span className="text-muted-foreground">-</span>
+    }
+
     switch (field.fieldType) {
         case 'url':
-            return <a href={String(value)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">{String(value).replace(/^https?:\/\//, '').split('/')[0]}<ExternalLink className="h-3 w-3" /></a>
+            return (
+                <a
+                    href={String(value)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline flex items-center gap-1"
+                >
+                    {String(value).replace(/^https?:\/\//, '').split('/')[0]}
+                    <ExternalLink className="h-3 w-3" />
+                </a>
+            )
         case 'currency':
             return <span>{field.currencySymbol || '€'}{Number(value).toFixed(2)}</span>
         case 'checkbox':

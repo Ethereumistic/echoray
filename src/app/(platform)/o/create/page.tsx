@@ -13,15 +13,18 @@ import { toast } from "sonner"
 import { Building2, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { organizationSchema, type OrganizationFormValues } from "@/lib/validations"
+import { useAuthStore } from "@/stores/auth-store"
 
 /**
  * Page to create a new organization.
+ * Route: /o/create
  * Uses the bitwise create_organization RPC.
  */
 export default function CreateOrganizationPage() {
     const router = useRouter()
+    const { profile } = useAuthStore()
     const createOrg = useMutation(api.organizations.createOrganization)
-    // No auth store variables needed currently
+
     const [isLoading, setIsLoading] = useState(false)
     const [name, setName] = useState("")
     const [slug, setSlug] = useState("")
@@ -75,8 +78,8 @@ export default function CreateOrganizationPage() {
 
             toast.success("Organization created successfully!")
 
-            // Redirect to dashboard
-            router.push("/dashboard")
+            // Redirect to personal workspace
+            router.push(`/p/${profile?.id}`)
         } catch (err) {
             console.error("Error creating organization:", err)
             const message = err instanceof Error ? err.message : "Failed to create organization"
@@ -86,11 +89,14 @@ export default function CreateOrganizationPage() {
         }
     }
 
+    // Get back URL (personal workspace)
+    const backUrl = profile?.id ? `/p/${profile.id}` : '/'
+
     return (
         <div className="flex-1 space-y-4 p-8 pt-6 max-w-2xl mx-auto">
             <div className="flex items-center gap-4 mb-8">
                 <Button variant="ghost" size="icon" asChild>
-                    <Link href="/dashboard">
+                    <Link href={backUrl}>
                         <ArrowLeft className="size-4" />
                     </Link>
                 </Button>
@@ -169,7 +175,7 @@ export default function CreateOrganizationPage() {
                     </CardContent>
                     <CardFooter className="flex justify-end gap-2 border-t border-border/50 pt-6">
                         <Button variant="ghost" asChild disabled={isLoading}>
-                            <Link href="/dashboard">Cancel</Link>
+                            <Link href={backUrl}>Cancel</Link>
                         </Button>
                         <Button type="submit" disabled={isLoading} className="min-w-[140px]">
                             {isLoading ? (

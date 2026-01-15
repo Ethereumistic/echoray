@@ -20,35 +20,63 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover'
-import { Plus, Folder, Lock, Loader2, Trash2 } from 'lucide-react'
+import { Plus, Folder, Lock, Loader2, Trash2, User, Building2 } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../../../../convex/_generated/api'
 import { Id } from '../../../../../../convex/_generated/dataModel'
 import { useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
 import { useAuthStore } from '@/stores/auth-store'
+import { useScopeContext } from '../layout'
+
+// Query to get organization details by ID
+function useOrganizationById(orgId: string | null) {
+    return useQuery(
+        api.organizations.getOrganization,
+        orgId ? { id: orgId as Id<"organizations"> } : "skip"
+    )
+}
 
 /**
- * Organization Projects page.
- * Lists all projects for the current organization with real Convex data.
- * Uses project.create permission check for gating.
+ * Unified Projects page for both personal (p) and organization (o) scopes.
+ * Route: /p/[userId]/projects or /o/[orgId]/projects
  */
-export default function OrgProjectsPage() {
-    const params = useParams()
-    const slug = params.slug as string
-    const { activeOrganization } = useAuthStore()
+export default function ProjectsPage() {
+    const { scope, slug, isPersonal, isOrganization } = useScopeContext()
+    const { profile, activeOrganization, hasPermission } = useAuthStore()
+    const isStaffAdmin = hasPermission('system.admin')
 
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [projectName, setProjectName] = useState('')
     const [projectDescription, setProjectDescription] = useState('')
     const [isCreating, setIsCreating] = useState(false)
 
-    // Fetch real projects from Convex for this organization
-    const projects = useQuery(
+    // ========================================================================
+    // Personal Projects Logic
+    // ========================================================================
+    const isViewingOtherUser = isPersonal && profile?.id && slug !== profile.id
+
+    // For organization scope, use the slug (orgId) from URL directly
+    const urlOrgId = isOrganization ? slug as Id<"organizations"> : null
+
+    // Fetch organization details by ID (for display name)
+    const organizationDetails = useOrganizationById(isOrganization ? slug : null)
+
+    // Fetch projects based on scope
+    const myProjects = useQuery(
         api.projects.listMyProjects,
-        activeOrganization?._id ? { organizationId: activeOrganization._id } : "skip"
+        isPersonal && !isViewingOtherUser ? {} :
+            isOrganization && urlOrgId ? { organizationId: urlOrgId } :
+                "skip"
     )
+    const otherUserProjects = useQuery(
+        api.projects.listProjectsByOwner,
+        isViewingOtherUser && isStaffAdmin ? { ownerId: slug as Id<"users"> } : "skip"
+    )
+
+    // Use the appropriate projects list
+    const projects = isViewingOtherUser && isStaffAdmin ? otherUserProjects : myProjects
+
     const canCreateResult = useQuery(api.projects.canCreateProject)
     const createProject = useMutation(api.projects.createProject)
     const deleteProject = useMutation(api.projects.deleteProject)
@@ -56,15 +84,59 @@ export default function OrgProjectsPage() {
     const canCreate = canCreateResult?.canCreate ?? false
     const isLoading = projects === undefined
 
+    // ========================================================================
+    // Computed Values
+    // ========================================================================
+    const displayName = isPersonal
+        ? (isViewingOtherUser ? `User ${slug.slice(0, 8)}...` : (profile?.displayName || 'Personal'))
+        : (organizationDetails?.name || slug)
+
+    const pageTitle = isPersonal ? 'Personal Projects' : 'Projects'
+    const pageDescription = isPersonal
+        ? `Personal projects for ${displayName}`
+        : `Projects for ${displayName}`
+
+    // Show warning if viewing wrong user's route (personal only, unless staff admin)
+    if (isPersonal && isViewingOtherUser && !isStaffAdmin) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+                <div className="rounded-full bg-amber-500/10 p-4">
+                    <User className="h-8 w-8 text-amber-500" />
+                </div>
+                <h2 className="text-2xl font-bold">Wrong Personal Workspace</h2>
+                <p className="text-muted-foreground text-center max-w-md">
+                    This URL belongs to a different user&apos;s personal workspace.
+                    You can only view your own personal projects.
+                </p>
+                <Link href={`/p/${profile?.id}/projects`}>
+                    <Button>
+                        Go to My Projects
+                    </Button>
+                </Link>
+            </div>
+        )
+    }
+
+    // ========================================================================
+    // Handlers
+    // ========================================================================
     const handleCreateProject = async () => {
-        if (!projectName.trim() || !activeOrganization?._id) return
+        if (!projectName.trim()) return
+        if (isOrganization && !activeOrganization?._id) return
 
         setIsCreating(true)
         try {
             await createProject({
                 name: projectName.trim(),
                 description: projectDescription.trim() || undefined,
-                organizationId: activeOrganization._id,
+                // For personal: staff admins can create for target user
+                ...(isPersonal && isViewingOtherUser && isStaffAdmin
+                    ? { targetOwnerId: slug as Id<"users"> }
+                    : {}),
+                // For organization - use URL org ID
+                ...(isOrganization && urlOrgId
+                    ? { organizationId: urlOrgId }
+                    : {}),
             })
             setProjectName('')
             setProjectDescription('')
@@ -100,14 +172,32 @@ export default function OrgProjectsPage() {
         return `${Math.floor(diff / 86400000)} days ago`
     }
 
+    // ========================================================================
+    // Render
+    // ========================================================================
     return (
         <div className="flex flex-col">
             <DashboardHeader
-                title="Projects"
-                description={`Projects for ${activeOrganization?.name || slug}`}
+                title={pageTitle}
+                description={pageDescription}
             />
 
             <main className="flex-1 p-6 space-y-6">
+                {/* Scope Badge */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {isPersonal ? (
+                        <>
+                            <User className="h-4 w-4" />
+                            <span>Personal Workspace</span>
+                        </>
+                    ) : (
+                        <>
+                            <Building2 className="h-4 w-4" />
+                            <span>{organizationDetails?.name || 'Organization'}</span>
+                        </>
+                    )}
+                </div>
+
                 {/* Actions */}
                 <div className="flex items-center justify-between">
                     <div>
@@ -127,9 +217,14 @@ export default function OrgProjectsPage() {
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-[425px]">
                                 <DialogHeader>
-                                    <DialogTitle>Create New Project</DialogTitle>
+                                    <DialogTitle>
+                                        {isPersonal ? 'Create Personal Project' : 'Create New Project'}
+                                    </DialogTitle>
                                     <DialogDescription>
-                                        Create a new project for {activeOrganization?.name || 'this organization'}.
+                                        {isPersonal
+                                            ? 'Create a new personal project. This will be private to your account.'
+                                            : `Create a new project for ${organizationDetails?.name || 'this organization'}.`
+                                        }
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="grid gap-4 py-4">
@@ -204,7 +299,7 @@ export default function OrgProjectsPage() {
                                     </p>
                                     <Link
                                         href="/dashboard/subscription"
-                                        className="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-primary to-primary/80 rounded-lg hover:opacity-90 transition-opacity"
+                                        className="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-white bg-linear-to-r from-primary to-primary/80 rounded-lg hover:opacity-90 transition-opacity"
                                     >
                                         View Upgrade Options
                                     </Link>
@@ -223,7 +318,7 @@ export default function OrgProjectsPage() {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {/* Existing Projects */}
                         {projects && projects.map((project) => (
-                            <Link key={project._id} href={`/o/${slug}/${project._id}`}>
+                            <Link key={project._id} href={`/${scope}/${slug}/${project._id}`}>
                                 <Card className="hover:border-primary/50 transition-colors cursor-pointer group h-full">
                                     <CardHeader className="flex flex-row items-start justify-between">
                                         <div className="flex items-center gap-3">
@@ -265,7 +360,7 @@ export default function OrgProjectsPage() {
                             </Link>
                         ))}
 
-                        {/* Create New Project Card - always visible but conditionally functional */}
+                        {/* Create New Project Card */}
                         {canCreate ? (
                             <Card
                                 className="border-dashed hover:border-primary/50 transition-colors cursor-pointer flex items-center justify-center min-h-[140px]"
@@ -306,7 +401,7 @@ export default function OrgProjectsPage() {
                                         </p>
                                         <Link
                                             href="/dashboard/subscription"
-                                            className="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-primary to-primary/80 rounded-lg hover:opacity-90 transition-opacity"
+                                            className="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-white bg-linear-to-r from-primary to-primary/80 rounded-lg hover:opacity-90 transition-opacity"
                                         >
                                             View Upgrade Options
                                         </Link>

@@ -3,10 +3,10 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { OrgInitializer } from '@/components/dashboard/org-initializer'
 
 /**
- * Dashboard layout for authenticated pages.
- * Includes sidebar navigation and content area.
+ * Layout for /o routes (organization-level actions like create).
+ * Different from [scope]/[slug] layout - this is for org-wide actions.
  */
-export default function DashboardLayout({
+export default function OrgActionsLayout({
     children,
 }: {
     children: React.ReactNode

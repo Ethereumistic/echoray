@@ -147,7 +147,7 @@ const getNavItems = (
             icon: Settings
         })
     } else {
-        items.push({ title: "Settings", href: "/dashboard/settings", icon: Settings })
+        items.push({ title: "Settings", href: "/p/settings", icon: Settings })
     }
 
     return items
@@ -378,7 +378,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 {/* Create Organization - conditionally locked based on tier limits */}
                                 {canCreateOrg ? (
                                     <DropdownMenuItem asChild className="gap-2 p-2 rounded-lg text-muted-foreground cursor-pointer">
-                                        <Link href="/dashboard/organizations/create" className="flex items-center gap-2">
+                                        <Link href="/o/create" className="flex items-center gap-2">
                                             <Plus className="size-4" />
                                             <span className="text-sm">Create Organization</span>
                                         </Link>
@@ -441,7 +441,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                    <Link href="/dashboard/settings" className="flex items-center gap-2 p-2 rounded-lg cursor-pointer">
+                                    <Link href="/p/settings" className="flex items-center gap-2 p-2 rounded-lg cursor-pointer">
                                         <Settings className="size-4" />
                                         <span>Settings</span>
                                     </Link>

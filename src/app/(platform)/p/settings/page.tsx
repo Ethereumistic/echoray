@@ -11,10 +11,11 @@ import { MembersList } from '@/components/dashboard/members-list'
 import { User, Shield, Building2, Users } from 'lucide-react'
 
 /**
- * Dashboard settings page.
+ * Personal settings page.
+ * Route: /p/settings
  * Allows users to manage their account settings and active organization.
  */
-export default function SettingsPage() {
+export default function PersonalSettingsPage() {
     const { profile, activeOrganization } = useAuthStore()
 
     return (

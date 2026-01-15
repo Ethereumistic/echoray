@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -8,15 +8,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { OrgSettingsForm } from "@/components/dashboard/org-settings-form"
 import { MembersList } from "@/components/dashboard/members-list"
 import { RolesList } from "@/components/dashboard/roles-list"
-import { Settings, Users, Shield, Loader2 } from "lucide-react"
+import { Settings, Users, Shield, Loader2, User } from "lucide-react"
 import { useEffect, useState } from "react"
+import { redirect } from "next/navigation"
+import { useScopeContext } from "../layout"
 
 /**
- * Organization-specific settings page.
- * Provides a focused interface for managing the organization's members, roles, and profile.
+ * Unified Settings page for both personal (p) and organization (o) scopes.
+ * Route: /p/[userId]/settings or /o/[orgId]/settings
+ * 
+ * - Personal: Redirects to /dashboard/settings
+ * - Organization: Shows org-specific settings tabs
  */
-export default function OrgSettingsPage() {
-    const { slug } = useParams()
+export default function SettingsPage() {
+    const { scope, slug, isPersonal, isOrganization } = useScopeContext()
     const searchParams = useSearchParams()
     const router = useRouter()
     const {
@@ -29,10 +34,15 @@ export default function OrgSettingsPage() {
     const currentTab = searchParams.get('tab') || 'general'
     const [isSwitching, setIsSwitching] = useState(false)
 
-    useEffect(() => {
-        if (!slug || isAuthLoading) return
+    // Personal settings redirect to dashboard settings
+    if (isPersonal) {
+        redirect('/dashboard/settings')
+    }
 
-        // Ensure we are working with the correct organization context (slug is now org ID)
+    useEffect(() => {
+        if (!slug || isAuthLoading || isPersonal) return
+
+        // Ensure we are working with the correct organization context
         if (activeOrganization?._id !== slug) {
             const targetOrg = organizations.find(o => o._id === slug)
             if (targetOrg) {
@@ -41,12 +51,12 @@ export default function OrgSettingsPage() {
                 setTimeout(() => setIsSwitching(false), 100)
             }
         }
-    }, [slug, organizations, activeOrganization, isAuthLoading, setActiveOrganization])
+    }, [slug, organizations, activeOrganization, isAuthLoading, isPersonal, setActiveOrganization])
 
     const handleTabChange = (value: string) => {
         const params = new URLSearchParams(searchParams.toString())
         params.set('tab', value)
-        router.push(`/o/${slug}/settings?${params.toString()}`)
+        router.push(`/${scope}/${slug}/settings?${params.toString()}`)
     }
 
     if (isAuthLoading || isSwitching) {
