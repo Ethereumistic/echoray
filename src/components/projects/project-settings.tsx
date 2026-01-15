@@ -39,7 +39,17 @@ import {
     ArrowLeft,
     Check,
 } from 'lucide-react'
-import { FieldSchemaEditor, FieldDefinition, FIELD_TYPES } from './field-editor'
+import { FieldSchemaEditor, FieldDefinition } from './field-editor'
+
+// Schema field interface for type safety
+interface SchemaField {
+    fieldKey: string
+    fieldName: string
+    fieldType: string
+    subTypes?: string[]
+    simpleOptions?: string[]
+    isRequired?: boolean
+}
 
 // View type options
 const VIEW_TYPES = [
@@ -57,7 +67,7 @@ interface ProjectSettingsProps {
         defaultView?: string
         isSetupComplete?: boolean
     }
-    schema: any[]
+    schema: SchemaField[]
     recordCount: number
     isOpen: boolean
     onClose: () => void
@@ -101,12 +111,11 @@ export function ProjectSettings({
 
     // Check for breaking changes
     const detectBreakingChanges = () => {
-        const originalFieldKeys = new Set(schema.map((f: any) => f.fieldKey))
         const newFieldKeys = new Set(fields.map(f => f.fieldKey))
 
         // Removed fields
         const removedFields: string[] = []
-        schema.forEach((f: any) => {
+        schema.forEach((f: SchemaField) => {
             if (!newFieldKeys.has(f.fieldKey)) {
                 removedFields.push(f.fieldName)
             }
@@ -115,7 +124,7 @@ export function ProjectSettings({
         // Type-changed fields (only count as breaking if there's data)
         const changedFields: string[] = []
         fields.forEach(f => {
-            const originalField = schema.find((of: any) => of.fieldKey === f.fieldKey)
+            const originalField = schema.find((of: SchemaField) => of.fieldKey === f.fieldKey)
             if (originalField && originalField.fieldType !== f.fieldType) {
                 changedFields.push(f.fieldName || originalField.fieldName)
             }
@@ -154,7 +163,7 @@ export function ProjectSettings({
                 id: project._id,
                 name,
                 description: description || undefined,
-                defaultView: defaultView as any,
+                defaultView: defaultView as "table" | "kanban" | "cards" | "gallery",
             })
 
             // Update field schema

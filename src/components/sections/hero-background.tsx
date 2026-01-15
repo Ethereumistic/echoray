@@ -101,12 +101,21 @@ const TracingLine = ({ path, delay, duration, reverse = false, totalCycle }: {
                     opacity: [0, 0.4, 0.4, 0]
                 }}
                 transition={{
-                    duration: duration,
-                    repeat: Infinity,
-                    repeatDelay: totalCycle - duration,
-                    delay: delay,
-                    ease: "linear",
-                    opacity: { times: [0, 0.05, 0.95, 1], duration: duration }
+                    pathOffset: {
+                        duration: duration,
+                        repeat: Infinity,
+                        repeatDelay: totalCycle - duration,
+                        delay: delay,
+                        ease: "linear"
+                    },
+                    opacity: {
+                        duration: duration,
+                        times: [0, 0.05, 0.95, 1],
+                        repeat: Infinity,
+                        repeatDelay: totalCycle - duration,
+                        delay: delay,
+                        ease: "linear"
+                    }
                 }}
                 style={{
                     filter: "blur(0.5rem) brightness(1.5)",
@@ -120,21 +129,30 @@ const TracingLine = ({ path, delay, duration, reverse = false, totalCycle }: {
                 strokeWidth="1"
                 fill="none"
                 initial={{
-                    pathLength: 0.1,
-                    pathOffset: reverse ? 1 : -0.1,
+                    pathLength: 0.12,
+                    pathOffset: reverse ? 1 : -0.12,
                     opacity: 0
                 }}
                 animate={{
-                    pathOffset: reverse ? -0.1 : 1,
+                    pathOffset: reverse ? -0.12 : 1,
                     opacity: [0, 1, 1, 0]
                 }}
                 transition={{
-                    duration: duration,
-                    repeat: Infinity,
-                    repeatDelay: totalCycle - duration,
-                    delay: delay,
-                    ease: "linear",
-                    opacity: { times: [0, 0.05, 0.95, 1], duration: duration }
+                    pathOffset: {
+                        duration: duration,
+                        repeat: Infinity,
+                        repeatDelay: totalCycle - duration,
+                        delay: delay,
+                        ease: "linear"
+                    },
+                    opacity: {
+                        duration: duration,
+                        times: [0, 0.05, 0.95, 1],
+                        repeat: Infinity,
+                        repeatDelay: totalCycle - duration,
+                        delay: delay,
+                        ease: "linear"
+                    }
                 }}
                 style={{
                     filter: "drop-shadow(0 0 0.5rem var(--primary))",
@@ -146,7 +164,7 @@ const TracingLine = ({ path, delay, duration, reverse = false, totalCycle }: {
 }
 
 const TechBubble = ({ Icon, x, y, duration, delay, totalCycle, reverse = false }: {
-    Icon: React.ElementType,
+    Icon: any,
     x: number,
     y: number,
     duration: number,
@@ -155,10 +173,18 @@ const TechBubble = ({ Icon, x, y, duration, delay, totalCycle, reverse = false }
     reverse?: boolean
 }) => {
     const progress = x / 1000
-    const timeAtX = reverse ? (1 - progress) * duration : progress * duration
+
+    // Precise timing: head reaches progress at (dist / total_dist) * duration
+    // total_dist is 1 + pathLength = 1.12
+    const timeAtX = reverse
+        ? ((1 - progress) / 1.12) * duration
+        : (progress / 1.12) * duration
+
+    // Duration the 0.12 length tracer spends over a single point
+    const glowDuration = (0.12 / 1.12) * duration
 
     // Pulse peak timing (sync with streak)
-    let pulseDelay = (delay + timeAtX - 1.25) % totalCycle
+    let pulseDelay = (delay + timeAtX) % totalCycle
     if (pulseDelay < 0) pulseDelay += totalCycle
 
     return (
@@ -174,27 +200,28 @@ const TechBubble = ({ Icon, x, y, duration, delay, totalCycle, reverse = false }
             <motion.div
                 className="absolute inset-0 rounded-full bg-primary/40 blur-[1.5rem]"
                 animate={{
-                    scale: [0.8, 2.2, 0.8],
-                    opacity: [0, 0.7, 0]
+                    opacity: [0, 1, 1, 0],
+                    scale: [0.8, 1.8, 0.8]
                 }}
                 transition={{
-                    duration: 2.5,
+                    duration: glowDuration,
                     repeat: Infinity,
-                    repeatDelay: totalCycle - 2.5,
+                    repeatDelay: totalCycle - glowDuration,
                     delay: pulseDelay,
+                    times: [0, 0.1, 0.9, 1]
                 }}
             />
 
             {/* --- BUBBLE CONTAINER --- */}
-            <div className="relative flex items-center justify-center w-12 h-12 rounded-full border border-primary/20 bg-background/60 backdrop-blur-[2rem] shadow-[0_0_1.5rem_rgba(var(--primary),0.1)]">
-                <Icon className="w-5 h-5 text-primary brightness-110" />
+            <div className="relative flex items-center justify-center w-[3rem] h-[3rem] rounded-full border border-primary/20 bg-background/60 backdrop-blur-[2rem] shadow-[0_0_1.5rem_rgba(var(--primary),0.1)]">
+                <Icon className="w-[1.25rem] h-[1.25rem] text-primary brightness-110" />
             </div>
         </div>
     )
 }
 
 export function HeroBackground() {
-    const T_DURATION = 60
+    const T_DURATION = 3
     const TOTAL_CYCLE = T_DURATION * 3
 
     // 3 Perfectly Symmetric Arched Paths (Using Rem Concept for Base Levels)
@@ -203,13 +230,13 @@ export function HeroBackground() {
     // 2. Middle Arch: Arches through the main heading
     const track2 = createSymmetricPath(500, 30)
     // 3. Bottom Arch: Arches DOWN between subtext and buttons
-    const track3 = createSymmetricPath(720, 140)
+    const track3 = createSymmetricPath(720, 180)
 
     return (
-        <div className="absolute inset-0 -z-10 hidden xl:block overflow-hidden bg-background">
+        <div className="absolute inset-0 -z-10 overflow-hidden bg-background">
             {/* --- PRIMARY BLUE SPHERES --- */}
-            <Sphere color="var(--primary)" size="62.5rem" initialX="-15%" initialY="10%" duration={25} />
-            <Sphere color="var(--primary)" size="50rem" initialX="65%" initialY="-5%" duration={30} />
+            <Sphere color="var(--primary)" size="50rem" initialX="-15%" initialY="-22%" duration={30} />
+            <Sphere color="var(--primary)" size="50rem" initialX="65%" initialY="-22%" duration={30} />
             <Sphere color="var(--primary)" size="75rem" initialX="15%" initialY="55%" duration={35} />
 
             {/* --- TRACING LINES (SEQUENTIAL) --- */}

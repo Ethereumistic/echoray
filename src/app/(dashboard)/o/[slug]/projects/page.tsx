@@ -23,6 +23,7 @@ import {
 import { Plus, Folder, Lock, Loader2, Trash2 } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../../../../convex/_generated/api'
+import { Id } from '../../../../../../convex/_generated/dataModel'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -80,7 +81,7 @@ export default function OrgProjectsPage() {
         if (!confirm('Are you sure you want to delete this project?')) return
 
         try {
-            await deleteProject({ id: projectId as any })
+            await deleteProject({ id: projectId as Id<"projects"> })
         } catch (error) {
             console.error('Failed to delete project:', error)
             alert(error instanceof Error ? error.message : 'Failed to delete project')

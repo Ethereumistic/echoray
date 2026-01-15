@@ -202,3 +202,19 @@ body {
 .animate-gradient-x {
 	animation: gradient-x 5s ease infinite;
 }
+
+/* Marquee animation for logo cloud */
+@keyframes marquee {
+	0% {
+		transform: translateX(0);
+	}
+
+	100% {
+		transform: translateX(-50%);
+	}
+}
+
+.animate-marquee {
+	animation: marquee var(--marquee-duration, 60s) linear infinite;
+	will-change: transform;
+}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../../../../convex/_generated/api'
 import { Id } from '../../../../../../convex/_generated/dataModel'
@@ -119,9 +119,25 @@ const VIEW_TYPES = [
     { value: "gallery", label: "Gallery", icon: ImageIcon, description: "Image-focused grid" },
 ]
 
+// Field schema interface for type safety (matches Convex projectFields type)
+interface FieldSchema {
+    fieldKey: string
+    fieldName: string
+    fieldType: string
+    isRequired?: boolean
+    placeholder?: string
+    currencySymbol?: string
+    options?: { color?: string; value: string; label: string }[]
+}
+
+// Record interface
+interface ProjectRecord {
+    _id: Id<"projectRecords">
+    data?: Record<string, string | number | boolean>
+}
+
 export default function OrgProjectDetailPage() {
     const params = useParams()
-    const router = useRouter()
     const orgSlug = params.slug as string
     const projectParam = params.project as string
     const { activeOrganization } = useAuthStore()
@@ -133,10 +149,6 @@ export default function OrgProjectDetailPage() {
     )
     const projectData = useQuery(
         api.projects.getProjectRecords,
-        project ? { projectId: project._id } : "skip"
-    )
-    const projectViews = useQuery(
-        api.projects.getProjectViews,
         project ? { projectId: project._id } : "skip"
     )
 
@@ -156,7 +168,7 @@ export default function OrgProjectDetailPage() {
 
     // Record form state
     const [isAddingRecord, setIsAddingRecord] = useState(false)
-    const [newRecordData, setNewRecordData] = useState<Record<string, any>>({})
+    const [newRecordData, setNewRecordData] = useState<Record<string, string | number | boolean>>({})
 
     // Settings dialog state
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -509,35 +521,35 @@ export default function OrgProjectDetailPage() {
 // HELPER COMPONENTS (same as personal projects page)
 // =========================================================================
 
-function DynamicFieldInput({ field, value, onChange }: { field: any; value: any; onChange: (value: any) => void }) {
+function DynamicFieldInput({ field, value, onChange }: { field: FieldSchema; value: unknown; onChange: (value: string | number | boolean) => void }) {
     switch (field.fieldType) {
         case 'textarea':
-            return <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} />
+            return <Textarea value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} />
         case 'date':
-            return <Input type="date" value={value} onChange={(e) => onChange(e.target.value)} />
+            return <Input type="date" value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} />
         case 'number':
         case 'currency':
-            return <Input type="number" step="0.01" value={value} onChange={(e) => onChange(parseFloat(e.target.value) || 0)} placeholder={field.placeholder} />
+            return <Input type="number" step="0.01" value={typeof value === 'number' ? value : ''} onChange={(e) => onChange(parseFloat(e.target.value) || 0)} placeholder={field.placeholder} />
         case 'checkbox':
             return <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4" />
         case 'select':
             return (
-                <Select value={value} onValueChange={onChange}>
+                <Select value={String(value ?? '')} onValueChange={onChange}>
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
-                        {field.options?.map((opt: string) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                        {field.options?.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                     </SelectContent>
                 </Select>
             )
         case 'url':
         case 'email':
-            return <Input type={field.fieldType === 'email' ? 'email' : 'url'} value={value} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder || (field.fieldType === 'url' ? 'https://...' : 'email@example.com')} />
+            return <Input type={field.fieldType === 'email' ? 'email' : 'url'} value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder || (field.fieldType === 'url' ? 'https://...' : 'email@example.com')} />
         default:
-            return <Input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} />
+            return <Input type="text" value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} />
     }
 }
 
-function TableView({ schema, records, onDelete }: { schema: any[]; records: any[]; onDelete: (id: Id<"projectRecords">) => void }) {
+function TableView({ schema, records, onDelete }: { schema: FieldSchema[]; records: ProjectRecord[]; onDelete: (id: Id<"projectRecords">) => void }) {
     if (records.length === 0) return null
     return (
         <div className="rounded-lg border">
@@ -571,7 +583,7 @@ function TableView({ schema, records, onDelete }: { schema: any[]; records: any[
     )
 }
 
-function CardsView({ schema, records, onDelete }: { schema: any[]; records: any[]; onDelete: (id: Id<"projectRecords">) => void }) {
+function CardsView({ schema, records, onDelete }: { schema: FieldSchema[]; records: ProjectRecord[]; onDelete: (id: Id<"projectRecords">) => void }) {
     if (records.length === 0) return null
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -597,12 +609,12 @@ function CardsView({ schema, records, onDelete }: { schema: any[]; records: any[
     )
 }
 
-function KanbanView({ schema, records, onDelete }: { schema: any[]; records: any[]; onDelete: (id: Id<"projectRecords">) => void }) {
+function KanbanView({ schema, records, onDelete }: { schema: FieldSchema[]; records: ProjectRecord[]; onDelete: (id: Id<"projectRecords">) => void }) {
     const groupByField = schema.find(f => f.fieldType === 'select')
     const grouped = useMemo(() => {
         if (!groupByField) return { 'All Records': records }
-        return records.reduce((acc: Record<string, any[]>, record) => {
-            const groupValue = record.data?.[groupByField.fieldKey] || 'Uncategorized'
+        return records.reduce((acc: Record<string, ProjectRecord[]>, record) => {
+            const groupValue = String(record.data?.[groupByField.fieldKey] || 'Uncategorized')
             if (!acc[groupValue]) acc[groupValue] = []
             acc[groupValue].push(record)
             return acc
@@ -619,7 +631,7 @@ function KanbanView({ schema, records, onDelete }: { schema: any[]; records: any
                             <span className="text-xs bg-muted px-2 py-1 rounded">{groupRecords.length}</span>
                         </h3>
                         <div className="space-y-2">
-                            {groupRecords.map((record: any) => (
+                            {groupRecords.map((record: ProjectRecord) => (
                                 <Card key={record._id} className="group cursor-move">
                                     <CardContent className="p-3">
                                         <div className="flex items-start justify-between">
@@ -646,17 +658,17 @@ function KanbanView({ schema, records, onDelete }: { schema: any[]; records: any
     )
 }
 
-function CellDisplay({ field, value }: { field: any; value: any }) {
+function CellDisplay({ field, value }: { field: FieldSchema; value: unknown }) {
     if (value === undefined || value === null || value === '') return <span className="text-muted-foreground">-</span>
     switch (field.fieldType) {
         case 'url':
-            return <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">{value.replace(/^https?:\/\//, '').split('/')[0]}<ExternalLink className="h-3 w-3" /></a>
+            return <a href={String(value)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">{String(value).replace(/^https?:\/\//, '').split('/')[0]}<ExternalLink className="h-3 w-3" /></a>
         case 'currency':
-            return <span>{field.currencySymbol || '€'}{value.toFixed(2)}</span>
+            return <span>{field.currencySymbol || '€'}{Number(value).toFixed(2)}</span>
         case 'checkbox':
             return value ? <Check className="h-4 w-4 text-green-500" /> : <span>-</span>
         case 'date':
-            return <span>{new Date(value).toLocaleDateString()}</span>
+            return <span>{new Date(String(value)).toLocaleDateString()}</span>
         default:
             return <span>{String(value)}</span>
     }

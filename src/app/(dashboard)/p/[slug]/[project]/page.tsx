@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../../../../convex/_generated/api'
 import { Id } from '../../../../../../convex/_generated/dataModel'
@@ -74,8 +74,25 @@ import {
     Link2,
 } from 'lucide-react'
 import Link from 'next/link'
-import { FieldSchemaEditor, FieldDefinition, FIELD_TYPES } from '@/components/projects/field-editor'
+import { FieldSchemaEditor, FieldDefinition } from '@/components/projects/field-editor'
 import { ProjectSettings } from '@/components/projects/project-settings'
+
+// Field schema interface for type safety (matches Convex projectFields type)
+interface FieldSchema {
+    fieldKey: string
+    fieldName: string
+    fieldType: string
+    isRequired?: boolean
+    placeholder?: string
+    currencySymbol?: string
+    options?: { color?: string; value: string; label: string }[]
+}
+
+// Record interface
+interface ProjectRecord {
+    _id: Id<"projectRecords">
+    data?: Record<string, string | number | boolean>
+}
 
 // Extended field type icons
 const FIELD_TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -120,7 +137,6 @@ const VIEW_TYPES = [
 
 export default function ProjectDetailPage() {
     const params = useParams()
-    const router = useRouter()
     const userSlug = params.slug as string
     const projectParam = params.project as string
 
@@ -131,10 +147,6 @@ export default function ProjectDetailPage() {
     )
     const projectData = useQuery(
         api.projects.getProjectRecords,
-        project ? { projectId: project._id } : "skip"
-    )
-    const projectViews = useQuery(
-        api.projects.getProjectViews,
         project ? { projectId: project._id } : "skip"
     )
 
@@ -154,7 +166,7 @@ export default function ProjectDetailPage() {
 
     // Record form state
     const [isAddingRecord, setIsAddingRecord] = useState(false)
-    const [newRecordData, setNewRecordData] = useState<Record<string, any>>({})
+    const [newRecordData, setNewRecordData] = useState<Record<string, string | number | boolean>>({})
 
     // Settings dialog state
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -515,15 +527,15 @@ function DynamicFieldInput({
     value,
     onChange
 }: {
-    field: any
-    value: any
-    onChange: (value: any) => void
+    field: FieldSchema
+    value: unknown
+    onChange: (value: string | number | boolean) => void
 }) {
     switch (field.fieldType) {
         case 'textarea':
             return (
                 <Textarea
-                    value={value}
+                    value={String(value ?? '')}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={field.placeholder}
                 />
@@ -532,7 +544,7 @@ function DynamicFieldInput({
             return (
                 <Input
                     type="date"
-                    value={value}
+                    value={String(value ?? '')}
                     onChange={(e) => onChange(e.target.value)}
                 />
             )
@@ -542,7 +554,7 @@ function DynamicFieldInput({
                 <Input
                     type="number"
                     step="0.01"
-                    value={value}
+                    value={typeof value === 'number' ? value : ''}
                     onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
                     placeholder={field.placeholder}
                 />
@@ -558,13 +570,13 @@ function DynamicFieldInput({
             )
         case 'select':
             return (
-                <Select value={value} onValueChange={onChange}>
+                <Select value={String(value ?? '')} onValueChange={onChange}>
                     <SelectTrigger>
                         <SelectValue placeholder="Select..." />
                     </SelectTrigger>
                     <SelectContent>
-                        {field.options?.map((opt: string) => (
-                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        {field.options?.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
@@ -574,7 +586,7 @@ function DynamicFieldInput({
             return (
                 <Input
                     type={field.fieldType === 'email' ? 'email' : 'url'}
-                    value={value}
+                    value={String(value ?? '')}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={field.placeholder || (field.fieldType === 'url' ? 'https://...' : 'email@example.com')}
                 />
@@ -583,7 +595,7 @@ function DynamicFieldInput({
             return (
                 <Input
                     type="text"
-                    value={value}
+                    value={String(value ?? '')}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={field.placeholder}
                 />
@@ -600,8 +612,8 @@ function TableView({
     records,
     onDelete
 }: {
-    schema: any[]
-    records: any[]
+    schema: FieldSchema[]
+    records: ProjectRecord[]
     onDelete: (id: Id<"projectRecords">) => void
 }) {
     if (records.length === 0) return null
@@ -656,8 +668,8 @@ function CardsView({
     records,
     onDelete
 }: {
-    schema: any[]
-    records: any[]
+    schema: FieldSchema[]
+    records: ProjectRecord[]
     onDelete: (id: Id<"projectRecords">) => void
 }) {
     if (records.length === 0) return null
@@ -704,8 +716,8 @@ function KanbanView({
     records,
     onDelete
 }: {
-    schema: any[]
-    records: any[]
+    schema: FieldSchema[]
+    records: ProjectRecord[]
     onDelete: (id: Id<"projectRecords">) => void
 }) {
     // Group by first select field, or just show all in one column
@@ -716,8 +728,8 @@ function KanbanView({
             return { 'All Records': records }
         }
 
-        return records.reduce((acc: Record<string, any[]>, record) => {
-            const groupValue = record.data?.[groupByField.fieldKey] || 'Uncategorized'
+        return records.reduce((acc: Record<string, ProjectRecord[]>, record) => {
+            const groupValue = String(record.data?.[groupByField.fieldKey] || 'Uncategorized')
             if (!acc[groupValue]) acc[groupValue] = []
             acc[groupValue].push(record)
             return acc
@@ -736,7 +748,7 @@ function KanbanView({
                             </span>
                         </h3>
                         <div className="space-y-2">
-                            {groupRecords.map((record: any) => (
+                            {groupRecords.map((record: ProjectRecord) => (
                                 <Card key={record._id} className="group cursor-move">
                                     <CardContent className="p-3">
                                         <div className="flex items-start justify-between">
@@ -772,7 +784,7 @@ function KanbanView({
     )
 }
 
-function CellDisplay({ field, value }: { field: any; value: any }) {
+function CellDisplay({ field, value }: { field: FieldSchema; value: unknown }) {
     if (value === undefined || value === null || value === '') {
         return <span className="text-muted-foreground">-</span>
     }
@@ -781,21 +793,21 @@ function CellDisplay({ field, value }: { field: any; value: any }) {
         case 'url':
             return (
                 <a
-                    href={value}
+                    href={String(value)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary hover:underline flex items-center gap-1"
                 >
-                    {value.replace(/^https?:\/\//, '').split('/')[0]}
+                    {String(value).replace(/^https?:\/\//, '').split('/')[0]}
                     <ExternalLink className="h-3 w-3" />
                 </a>
             )
         case 'currency':
-            return <span>{field.currencySymbol || '€'}{value.toFixed(2)}</span>
+            return <span>{field.currencySymbol || '€'}{Number(value).toFixed(2)}</span>
         case 'checkbox':
             return value ? <Check className="h-4 w-4 text-green-500" /> : <span>-</span>
         case 'date':
-            return <span>{new Date(value).toLocaleDateString()}</span>
+            return <span>{new Date(String(value)).toLocaleDateString()}</span>
         default:
             return <span>{String(value)}</span>
     }
